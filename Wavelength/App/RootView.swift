@@ -69,9 +69,7 @@ private struct MainView: View {
   private var detail: some View {
     switch model.sidebar {
     case .podcasts:
-      if model.isRecordingNewEpisode {
-        NewRecordingView()
-      } else if let id = model.selectedEpisodeID {
+      if let id = model.selectedEpisodeID {
         EpisodeEditorView(episodeID: id)
           .id(id)
       } else {

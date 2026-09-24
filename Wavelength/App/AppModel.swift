@@ -1,5 +1,6 @@
-import Foundation
+import AppKit
 import Observation
+import SwiftUI
 
 enum SidebarItem: String, Hashable, CaseIterable, Identifiable {
   case podcasts
@@ -63,17 +64,18 @@ final class AppModel {
   let recorder = Recorder()
   let narration = NarrationDraft()
   let toasts = Toasts()
-  let signInCard = SignInCard()
+  let signInCard = CardWindowController()
+  let recordingCard = CardWindowController()
 
   var sidebar: SidebarItem = .podcasts
   var selectedEpisodeID: String?
   var selectedPostUID: String?
   var selectedDiscoverID: String?
-  var isRecordingNewEpisode = false
   var sheet: Sheet?
   var pendingNarrationTakes: [String: RecordedTake] = [:]
   @ObservationIgnored private var didStart = false
   @ObservationIgnored var openMainWindow: () -> Void = {}
+  @ObservationIgnored private weak var focusedWindow: NSWindow?
 
   init() {
     posts = PostsStore(session: session)
@@ -99,6 +101,54 @@ final class AppModel {
     Task { await didSignIn() }
   }
 
+  func showSignIn() {
+    signInCard.show(title: "Sign In") {
+      SignInView().appEnvironment(self)
+    }
+  }
+
+  func presentRecordingCard(title: String, autoStart: Bool, onFinish: @escaping (RecordedTake) async throws -> Void) {
+    guard !recordingCard.isVisible else { return }
+
+    let window = NSApp.keyWindow
+    focusedWindow = window
+    recordingCard.show(title: "Recording", centeredOn: window?.frame) {
+      RecordingCardView(title: title, autoStart: autoStart, onFinish: onFinish).appEnvironment(self)
+    }
+
+    guard let window else { return }
+
+    NSAnimationContext.runAnimationGroup { context in
+      context.duration = 0.25
+      window.animator().alphaValue = 0
+    }
+
+    Task {
+      try? await Task.sleep(for: .seconds(0.25))
+
+      if focusedWindow === window {
+        window.orderOut(nil)
+      }
+
+      window.alphaValue = focusedWindow === window ? 0 : 1
+    }
+  }
+
+  func endRecordingFocus() {
+    recordingCard.close()
+
+    guard let window = focusedWindow else { return }
+
+    focusedWindow = nil
+    window.alphaValue = 0
+    window.makeKeyAndOrderFront(nil)
+
+    NSAnimationContext.runAnimationGroup { context in
+      context.duration = 0.3
+      window.animator().alphaValue = 1
+    }
+  }
+
   func didSignIn() async {
     discover.reset()
     await posts.refresh()
@@ -114,30 +164,23 @@ final class AppModel {
     selectedPostUID = nil
     selectedDiscoverID = nil
     sheet = nil
-    isRecordingNewEpisode = false
-    signInCard.show(self)
+    endRecordingFocus()
+    showSignIn()
   }
 
   func startNewEpisode() {
-    sidebar = .podcasts
-    selectedEpisodeID = nil
-    isRecordingNewEpisode = true
+    presentRecordingCard(title: "New Episode", autoStart: false) { [weak self] take in
+      try self?.createEpisode(from: take)
+    }
   }
 
-  func finishNewEpisode(_ take: RecordedTake) {
-    do {
-      let episode = try library.create(from: take)
-      isRecordingNewEpisode = false
-      selectedEpisodeID = episode.id
-    } catch {
-      try? FileManager.default.removeItem(at: take.url)
-      toasts.show(error.localizedDescription)
-    }
+  private func createEpisode(from take: RecordedTake) throws {
+    let episode = try library.create(from: take)
+    select(episode: episode.id)
   }
 
   func select(episode id: String) {
     sidebar = .podcasts
-    isRecordingNewEpisode = false
     selectedEpisodeID = id
   }
 

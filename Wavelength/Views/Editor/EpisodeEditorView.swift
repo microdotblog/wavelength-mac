@@ -22,7 +22,7 @@ struct EpisodeEditorView: View {
             uploadLimitBanner(episode)
           }
 
-          SegmentEditorView(editor: document, player: player)
+          SegmentEditorView(editor: document, player: player, focusTitle: episode.title)
         }
         .navigationSubtitle(subtitle(episode))
         .toolbar { toolbar(episode) }

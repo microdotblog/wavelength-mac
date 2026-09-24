@@ -5,6 +5,7 @@ struct SegmentEditorView: View {
   let editor: any SegmentEditing
   let player: SegmentPlayer
   var recordTitle = "Record"
+  var focusTitle: String?
 
   @Environment(Toasts.self) private var toasts
   @State private var selectedSegment: String?
@@ -70,7 +71,7 @@ struct SegmentEditorView: View {
     if editor.isLocked {
       transport
     } else {
-      RecordingPanel(idleTitle: recordTitle, style: .bar, onFinish: appendRecording) {
+      RecordingPanel(idleTitle: recordTitle, style: .bar, focusTitle: focusTitle, onFinish: appendRecording) {
         transport
       }
     }

@@ -51,11 +51,6 @@ struct EpisodeListView: View {
         .help("New Episode (⌘N)")
       }
     }
-    .onChange(of: model.selectedEpisodeID) { _, id in
-      if id != nil {
-        model.isRecordingNewEpisode = false
-      }
-    }
     .alert("Rename Episode", isPresented: Binding(get: { renaming != nil }, set: { if !$0 { renaming = nil } })) {
       TextField("Episode name", text: $renameDraft)
       Button("Rename") { commitRename() }

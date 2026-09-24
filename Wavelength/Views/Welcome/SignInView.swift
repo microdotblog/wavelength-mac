@@ -33,14 +33,7 @@ struct SignInView: View {
       .padding(.horizontal, 32)
       .padding(.bottom, 28)
     }
-    .frame(width: 380, height: 540)
-    .background {
-      Backdrop()
-        .gesture(WindowDragGesture())
-        .allowsWindowActivationEvents(true)
-    }
-    .clipShape(.rect(cornerRadius: 30))
-    .glassEffect(.regular, in: .rect(cornerRadius: 30))
+    .floatingCard(width: 380, height: 540)
     .scaleEffect(isCardShown || reduceMotion ? 1 : 0.94)
     .offset(y: isCardShown || reduceMotion ? 0 : 14)
     .opacity(isCardShown ? 1 : 0)
@@ -315,21 +308,6 @@ private struct PrimaryCapsuleButton: View {
       .animation(.spring(duration: 0.2), value: configuration.isPressed)
       .contentShape(.capsule)
       .onHover { isHovered = $0 }
-  }
-}
-
-private struct Backdrop: View {
-  var body: some View {
-    ZStack {
-      Color.canvas.opacity(0.55)
-
-      RadialGradient(
-        colors: [Color.accentColor.opacity(0.32), Color.gold.opacity(0.10), .clear],
-        center: .top,
-        startRadius: 10,
-        endRadius: 360
-      )
-    }
   }
 }
 

@@ -37,7 +37,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
   func applicationDidFinishLaunching(_ notification: Notification) {
     if Keychain.load().userToken.nonEmpty == nil {
-      model.signInCard.show(model)
+      model.showSignIn()
     }
 
     Task { await model.start() }
@@ -46,7 +46,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
   func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows: Bool) -> Bool {
     guard model.session.isHydrated, !model.session.isSignedIn else { return true }
 
-    model.signInCard.show(model)
+    model.showSignIn()
     return false
   }
 }
@@ -84,7 +84,7 @@ private struct MainWindowRouting: ViewModifier {
   private func route() {
     guard session.isHydrated, !session.isSignedIn else { return }
 
-    model.signInCard.show(model)
+    model.showSignIn()
     dismissWindow(id: WindowID.main)
   }
 }

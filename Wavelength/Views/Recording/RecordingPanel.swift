@@ -3,23 +3,27 @@ import SwiftUI
 enum RecordingPanelStyle {
   case compact
   case bar
-  case hero
+  case card(title: String)
 }
 
 struct RecordingPanel<Accessory: View>: View {
   var idleTitle: String
   var style: RecordingPanelStyle
   var autoStart: Bool
+  var focusTitle: String?
   let onFinish: (RecordedTake) async throws -> Void
   var onCancel: (() -> Void)?
   let accessory: Accessory
 
   @Environment(Recorder.self) private var recorder
+  @Environment(AppModel.self) private var model
   @Environment(Toasts.self) private var toasts
   @State private var owner = UUID()
   @State private var isConfirmingCancel = false
   @State private var isSaving = false
   @State private var isPresent = false
+  @State private var isConfirmingDiscard = false
+  @State private var notice: String?
 
   private var isMine: Bool { recorder.isOwned(by: owner) }
 
@@ -27,6 +31,7 @@ struct RecordingPanel<Accessory: View>: View {
     idleTitle: String = "Record",
     style: RecordingPanelStyle = .compact,
     autoStart: Bool = false,
+    focusTitle: String? = nil,
     onFinish: @escaping (RecordedTake) async throws -> Void,
     onCancel: (() -> Void)? = nil,
     @ViewBuilder accessory: () -> Accessory
@@ -34,6 +39,7 @@ struct RecordingPanel<Accessory: View>: View {
     self.idleTitle = idleTitle
     self.style = style
     self.autoStart = autoStart
+    self.focusTitle = focusTitle
     self.onFinish = onFinish
     self.onCancel = onCancel
     self.accessory = accessory()
@@ -44,7 +50,7 @@ struct RecordingPanel<Accessory: View>: View {
       switch style {
       case .compact: compact
       case .bar: bar
-      case .hero: hero
+      case .card(let title): card(title)
       }
     }
     .focusedSceneValue(\.recordingActions, isMine ? RecordingActions(togglePause: { recorder.togglePause() }, finish: { finish() }) : nil)
@@ -59,6 +65,11 @@ struct RecordingPanel<Accessory: View>: View {
       if autoStart, !recorder.isActive {
         await start()
       }
+    }
+    .task(id: isConfirmingDiscard) {
+      guard isConfirmingDiscard else { return }
+      try? await Task.sleep(for: .seconds(3))
+      isConfirmingDiscard = false
     }
     .onAppear { isPresent = true }
     .onDisappear {
@@ -140,30 +151,44 @@ struct RecordingPanel<Accessory: View>: View {
     !recorder.isActive && !isSaving
   }
 
-  private var hero: some View {
-    VStack(spacing: 28) {
+  private func card(_ title: String) -> some View {
+    VStack(spacing: 0) {
+      VStack(alignment: .leading, spacing: 6) {
+        HStack(spacing: 8) {
+          RecordingDot(isPaused: !isMine || recorder.phase == .paused)
+          Text(cardStatus)
+            .font(.caption.weight(.heavy))
+            .tracking(2)
+            .foregroundStyle(isMine && recorder.phase == .recording ? Color.accentColor : Color.secondary)
+        }
+
+        Text(title)
+          .font(.title3.weight(.semibold))
+          .lineLimit(1)
+          .truncationMode(.middle)
+      }
+      .frame(maxWidth: .infinity, alignment: .leading)
+      .padding(.horizontal, 24)
+      .padding(.top, 22)
+
+      Spacer(minLength: 0)
+
       Text(isMine ? Formatting.duration(recorder.elapsed) : "0:00")
-        .font(.system(size: 64, weight: .semibold, design: .rounded).monospacedDigit())
-        .foregroundStyle(isMine ? .primary : .secondary)
+        .font(.system(size: 60, weight: .semibold, design: .rounded).monospacedDigit())
+        .foregroundStyle(isMine && recorder.phase == .recording ? .primary : .secondary)
         .contentTransition(.numericText())
+        .padding(.bottom, 18)
 
       liveWaveform(barWidth: 4, spacing: 3)
-        .frame(height: 96)
-        .frame(maxWidth: 640)
+        .frame(height: 84)
+        .mask(LinearGradient(colors: [.clear, .black, .black, .black], startPoint: .leading, endPoint: .trailing))
+        .padding(.horizontal, 28)
 
-      HStack(spacing: 28) {
-        if isMine {
-          Button {
-            isConfirmingCancel = true
-          } label: {
-            Image(systemName: "xmark")
-              .font(.title2.weight(.semibold))
-              .frame(width: 52, height: 52)
-          }
-          .buttonStyle(.plain)
-          .glassEffect(.regular.interactive(), in: .circle)
-          .help("Discard recording")
-        }
+      Spacer(minLength: 0)
+
+      HStack(spacing: 22) {
+        cardLeadingButton
+          .frame(width: 96)
 
         Button {
           if isMine {
@@ -177,39 +202,102 @@ struct RecordingPanel<Accessory: View>: View {
         .buttonStyle(.plain)
         .keyboardShortcut(.space, modifiers: [])
         .disabled(isSaving || (recorder.isActive && !isMine))
-        .help(isMine ? (recorder.phase == .paused ? "Resume" : "Pause") : "Start recording")
+        .help(isMine ? (recorder.phase == .paused ? "Resume (Space)" : "Pause (Space)") : "Start recording (Space)")
 
-        if isMine {
-          Button(action: finish) {
-            Image(systemName: "checkmark")
-              .font(.title2.weight(.bold))
-              .foregroundStyle(.white)
-              .frame(width: 52, height: 52)
-              .background(Color.accentColor, in: .circle)
+        Group {
+          if isMine {
+            Button(action: finish) {
+              Image(systemName: "checkmark")
+                .font(.title2.weight(.bold))
+                .foregroundStyle(.white)
+                .frame(width: 52, height: 52)
+                .background(Color.accentColor, in: .circle)
+            }
+            .buttonStyle(.plain)
+            .keyboardShortcut(.return, modifiers: [.command])
+            .help("Finish and save (⌘↩)")
+          } else {
+            Color.clear.frame(width: 52, height: 52)
           }
-          .buttonStyle(.plain)
-          .keyboardShortcut(.return, modifiers: [.command])
-          .help("Finish and save")
         }
+        .frame(width: 96)
       }
+      .padding(.bottom, 10)
 
-      HStack(spacing: 6) {
-        Text(heroHint)
-          .foregroundStyle(.secondary)
-        if !isMine {
-          InputDeviceMenu()
-            .fixedSize()
+      Group {
+        if let notice {
+          Label(notice, systemImage: "exclamationmark.triangle.fill")
+            .foregroundStyle(.orange)
+            .multilineTextAlignment(.center)
+            .padding(.horizontal, 24)
+        } else {
+          HStack(spacing: 6) {
+            Text(cardHint)
+              .foregroundStyle(.secondary)
+
+            if !isMine {
+              InputDeviceMenu()
+            }
+          }
         }
       }
-      .font(.callout)
+      .font(.caption)
+      .padding(.bottom, 22)
+      .task(id: notice) {
+        guard notice != nil else { return }
+        try? await Task.sleep(for: .seconds(4))
+        notice = nil
+      }
     }
   }
 
-  private var heroHint: String {
+  @ViewBuilder
+  private var cardLeadingButton: some View {
+    if !isMine {
+      circleButton("xmark", help: "Close") {
+        onCancel?()
+      }
+      .keyboardShortcut(.cancelAction)
+    } else if isConfirmingDiscard {
+      Button("Discard", action: cancel)
+        .buttonStyle(.borderedProminent)
+        .tint(.red)
+        .controlSize(.large)
+        .transition(.scale.combined(with: .opacity))
+        .help("Discard this recording")
+    } else {
+      circleButton("xmark", help: "Discard recording") {
+        withAnimation(.spring(duration: 0.25)) {
+          isConfirmingDiscard = true
+        }
+      }
+    }
+  }
+
+  private func circleButton(_ symbol: String, help: String, action: @escaping () -> Void) -> some View {
+    Button(action: action) {
+      Image(systemName: symbol)
+        .font(.title2.weight(.semibold))
+        .frame(width: 52, height: 52)
+    }
+    .buttonStyle(.plain)
+    .glassEffect(.regular.interactive(), in: .circle)
+    .help(help)
+  }
+
+  private var cardStatus: String {
     switch isMine ? recorder.phase : .idle {
-    case .idle: "Press Space to start recording."
-    case .recording: "Recording… press Space to pause."
-    case .paused: "Paused. Press Space to resume, or ⌘↩ to save."
+    case .idle: "READY"
+    case .recording: "RECORDING"
+    case .paused: "PAUSED"
+    }
+  }
+
+  private var cardHint: String {
+    switch isMine ? recorder.phase : .idle {
+    case .idle: "Space to start recording ·"
+    case .recording: "Space to pause · ⌘↩ to save"
+    case .paused: "Paused · Space to resume · ⌘↩ to save"
     }
   }
 
@@ -235,19 +323,29 @@ struct RecordingPanel<Accessory: View>: View {
   }
 
   private func start() async {
+    if let focusTitle, !isCard {
+      model.presentRecordingCard(title: focusTitle, autoStart: true, onFinish: onFinish)
+      return
+    }
+
+    notice = nil
     let didStart = await recorder.start(owner: owner)
 
     if didStart, !isPresent {
       recorder.cancel()
     } else if !didStart, let message = recorder.errorMessage {
-      toasts.show(message)
+      show(message)
     }
+  }
+
+  private var isCard: Bool {
+    if case .card = style { true } else { false }
   }
 
   private func finish() {
     guard isMine, let take = recorder.finish() else {
       if let message = recorder.errorMessage {
-        toasts.show(message)
+        show(message)
         recorder.errorMessage = nil
       }
       return
@@ -260,10 +358,18 @@ struct RecordingPanel<Accessory: View>: View {
         try await onFinish(take)
       } catch {
         try? FileManager.default.removeItem(at: take.url)
-        toasts.show(error.localizedDescription)
+        show(error.localizedDescription)
       }
 
       isSaving = false
+    }
+  }
+
+  private func show(_ message: String) {
+    if isCard {
+      notice = message
+    } else {
+      toasts.show(message)
     }
   }
 
@@ -273,7 +379,7 @@ struct RecordingPanel<Accessory: View>: View {
   }
 }
 
-private struct RecordButtonFace: View {
+struct RecordButtonFace: View {
   let phase: Recorder.Phase
   let level: Float
 
@@ -324,7 +430,7 @@ private struct RecordButtonFace: View {
   }
 }
 
-private struct RecordingDot: View {
+struct RecordingDot: View {
   let isPaused: Bool
 
   var body: some View {
@@ -393,10 +499,11 @@ extension RecordingPanel where Accessory == EmptyView {
     idleTitle: String = "Record",
     style: RecordingPanelStyle = .compact,
     autoStart: Bool = false,
+    focusTitle: String? = nil,
     onFinish: @escaping (RecordedTake) async throws -> Void,
     onCancel: (() -> Void)? = nil
   ) {
-    self.init(idleTitle: idleTitle, style: style, autoStart: autoStart, onFinish: onFinish, onCancel: onCancel) {
+    self.init(idleTitle: idleTitle, style: style, autoStart: autoStart, focusTitle: focusTitle, onFinish: onFinish, onCancel: onCancel) {
       EmptyView()
     }
   }
