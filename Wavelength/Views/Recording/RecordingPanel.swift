@@ -24,6 +24,7 @@ struct RecordingPanel<Accessory: View>: View {
   @State private var isPresent = false
   @State private var isConfirmingDiscard = false
   @State private var notice: String?
+  @State private var isStartingFromCard = false
 
   private var isMine: Bool { recorder.isOwned(by: owner) }
 
@@ -194,10 +195,15 @@ struct RecordingPanel<Accessory: View>: View {
           if isMine {
             recorder.togglePause()
           } else {
-            Task { await start() }
+            isStartingFromCard = true
+
+            Task {
+              await start()
+              isStartingFromCard = false
+            }
           }
         } label: {
-          RecordButtonFace(phase: isMine ? recorder.phase : .idle, level: isMine ? recorder.level : 0)
+          RecordButtonFace(phase: cardFacePhase, level: isMine ? recorder.level : 0)
         }
         .buttonStyle(.plain)
         .keyboardShortcut(.space, modifiers: [])
@@ -283,6 +289,16 @@ struct RecordingPanel<Accessory: View>: View {
     .buttonStyle(.plain)
     .glassEffect(.regular.interactive(), in: .circle)
     .help(help)
+  }
+
+  private var cardFacePhase: Recorder.Phase {
+    if isMine {
+      recorder.phase
+    } else if isStartingFromCard {
+      .recording
+    } else {
+      .idle
+    }
   }
 
   private var cardStatus: String {
@@ -414,19 +430,73 @@ struct RecordButtonFace: View {
     .contentShape(.circle)
   }
 
-  @ViewBuilder
   private var icon: some View {
-    if phase == .recording {
-      HStack(spacing: 9) {
-        RoundedRectangle(cornerRadius: 4).frame(width: 14, height: 44)
-        RoundedRectangle(cornerRadius: 4).frame(width: 14, height: 44)
-      }
-      .foregroundStyle(Color.accentColor)
-    } else {
-      Circle()
-        .fill(Color.accentColor)
-        .frame(width: 44, height: 44)
+    RecordGlyph(progress: phase == .recording ? 1 : 0)
+      .fill(Color.accentColor)
+      .frame(width: 120, height: 120)
+      .animation(.spring(duration: 0.25, bounce: 0.2), value: phase)
+  }
+}
+
+nonisolated private struct RecordGlyph: Shape {
+  var progress: CGFloat
+
+  var animatableData: CGFloat {
+    get { progress }
+    set { progress = newValue }
+  }
+
+  private struct Piece {
+    var rect: CGRect
+    var leading: CGFloat
+    var trailing: CGFloat
+  }
+
+  private static let dot = [
+    Piece(rect: CGRect(x: 0.317, y: 0.317, width: 0.183, height: 0.366), leading: 0.183, trailing: 0),
+    Piece(rect: CGRect(x: 0.5, y: 0.317, width: 0.183, height: 0.366), leading: 0, trailing: 0.183),
+  ]
+
+  private static let pause = [
+    Piece(rect: CGRect(x: 0.346, y: 0.317, width: 0.117, height: 0.366), leading: 0.033, trailing: 0.033),
+    Piece(rect: CGRect(x: 0.537, y: 0.317, width: 0.117, height: 0.366), leading: 0.033, trailing: 0.033),
+  ]
+
+  func path(in rect: CGRect) -> Path {
+    var path = Path()
+
+    for (from, to) in zip(Self.dot, Self.pause) {
+      let unit = CGRect(
+        x: mix(from.rect.minX, to.rect.minX),
+        y: mix(from.rect.minY, to.rect.minY),
+        width: mix(from.rect.width, to.rect.width),
+        height: mix(from.rect.height, to.rect.height)
+      )
+      let frame = CGRect(
+        x: rect.minX + unit.minX * rect.width,
+        y: rect.minY + unit.minY * rect.height,
+        width: unit.width * rect.width,
+        height: unit.height * rect.height
+      )
+      let leading = mix(from.leading, to.leading) * rect.width
+      let trailing = mix(from.trailing, to.trailing) * rect.width
+
+      path.addRoundedRect(
+        in: frame,
+        cornerRadii: RectangleCornerRadii(
+          topLeading: leading,
+          bottomLeading: leading,
+          bottomTrailing: trailing,
+          topTrailing: trailing
+        )
+      )
     }
+
+    return path
+  }
+
+  private func mix(_ from: CGFloat, _ to: CGFloat) -> CGFloat {
+    from + (to - from) * progress
   }
 }
 
