@@ -36,6 +36,7 @@ struct EpisodeListView: View {
               }
           }
         }
+        .environment(\.defaultMinListRowHeight, EpisodeRow.height)
         .onDeleteCommand {
           pendingDelete = library.episode(model.selectedEpisodeID)
         }
@@ -106,6 +107,8 @@ private struct OptionalEpisodeDeleteDialog: ViewModifier {
 }
 
 struct EpisodeRow: View {
+  static let height: CGFloat = 60
+
   let episode: Episode
   @Environment(Library.self) private var library
 
@@ -141,7 +144,7 @@ struct EpisodeRow: View {
         ProgressView().controlSize(.small)
       }
     }
-    .frame(height: 52)
+    .frame(height: Self.height - 8)
   }
 
   private var subtitle: String {
