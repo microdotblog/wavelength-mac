@@ -10,19 +10,25 @@ final class Recorder {
   }
 
   static let minimumSeconds = 1.0
-  static let liveHistoryCount = 240
+  static let liveHistoryCount = 400
+  nonisolated static let framesPerLevel = 2_646
+  static let liveSmoothing: Float = 0.4
+  nonisolated static let levelInterval = Double(framesPerLevel) / AudioEditing.sampleRate
   static let inputDeviceDefaultsKey = "inputDeviceUID"
 
   private(set) var phase: Phase = .idle
   private(set) var elapsed: Double = 0
   private(set) var level: Float = 0
   private(set) var liveLevels: [Float] = []
+  private(set) var liveEndTime: Double = 0
+  private(set) var liveReceivedAt = Date()
   private(set) var owner: UUID?
   var errorMessage: String?
 
   @ObservationIgnored private var engine: AVAudioEngine?
   @ObservationIgnored private var writer: TapWriter?
   @ObservationIgnored private var levels: [Float] = []
+  @ObservationIgnored private var smoothedLevel: Float = 0
   @ObservationIgnored private var activity: NSObjectProtocol?
   @ObservationIgnored private var isStarting = false
 
@@ -69,9 +75,9 @@ final class Recorder {
         throw AudioError(message: "No microphone is available.")
       }
 
-      let writer = try TapWriter(inputFormat: format, output: AppDirectories.scratchFile("recording")) { [weak self] level, frames in
+      let writer = try TapWriter(inputFormat: format, output: AppDirectories.scratchFile("recording")) { [weak self] levels, frames, levelFrames in
         Task { @MainActor in
-          self?.receive(level: level, frames: frames)
+          self?.receive(levels: levels, frames: frames, levelFrames: levelFrames)
         }
       }
 
@@ -83,6 +89,9 @@ final class Recorder {
       self.writer = writer
       levels = []
       liveLevels = []
+      smoothedLevel = 0
+      liveEndTime = 0
+      liveReceivedAt = Date()
       elapsed = 0
       level = 0
       owner = id
@@ -151,13 +160,23 @@ final class Recorder {
     }
   }
 
-  private func receive(level: Float, frames: Int64) {
+  private func receive(levels newLevels: [Float], frames: Int64, levelFrames: Int64) {
     guard phase == .recording else { return }
 
-    self.level = level
     elapsed = Double(frames) / AudioEditing.sampleRate
-    levels.append(level)
-    liveLevels.append(level)
+
+    guard !newLevels.isEmpty else { return }
+
+    levels += newLevels
+
+    for raw in newLevels {
+      smoothedLevel += (raw - smoothedLevel) * Self.liveSmoothing
+      liveLevels.append(smoothedLevel)
+    }
+
+    level = smoothedLevel
+    liveEndTime = Double(levelFrames) / AudioEditing.sampleRate
+    liveReceivedAt = Date()
 
     if liveLevels.count > Self.liveHistoryCount {
       liveLevels.removeFirst(liveLevels.count - Self.liveHistoryCount)
@@ -188,11 +207,14 @@ private nonisolated final class TapWriter: @unchecked Sendable {
   private let converter: AVAudioConverter
   private let monoFormat: AVAudioFormat
   private let stereoFormat: AVAudioFormat
-  private let onLevel: @Sendable (Float, Int64) -> Void
+  private let onLevels: @Sendable ([Float], Int64, Int64) -> Void
   private let lock = NSLock()
   private var framesWritten: Int64 = 0
+  private var chunkSum: Float = 0
+  private var chunkCount = 0
+  private var levelFrames: Int64 = 0
 
-  init(inputFormat: AVAudioFormat, output: URL, onLevel: @escaping @Sendable (Float, Int64) -> Void) throws {
+  init(inputFormat: AVAudioFormat, output: URL, onLevels: @escaping @Sendable ([Float], Int64, Int64) -> Void) throws {
     guard let mono = AVAudioFormat(commonFormat: .pcmFormatFloat32, sampleRate: AudioEditing.sampleRate, channels: 1, interleaved: false),
           let stereo = AVAudioFormat(commonFormat: .pcmFormatFloat32, sampleRate: AudioEditing.sampleRate, channels: 2, interleaved: false),
           let converter = AVAudioConverter(from: inputFormat, to: mono) else {
@@ -204,7 +226,7 @@ private nonisolated final class TapWriter: @unchecked Sendable {
     self.monoFormat = mono
     self.stereoFormat = stereo
     self.converter = converter
-    self.onLevel = onLevel
+    self.onLevels = onLevels
     self.file = try AVAudioFile(
       forWriting: output,
       settings: AudioEditing.canonicalSettings,
@@ -248,13 +270,21 @@ private nonisolated final class TapWriter: @unchecked Sendable {
     }
 
     let count = Int(mono.frameLength)
-    var sumOfSquares: Float = 0
+    var levels: [Float] = []
 
     for index in 0..<count {
       let sample = source[index]
       left[index] = sample
       right[index] = sample
-      sumOfSquares += sample * sample
+      chunkSum += sample * sample
+      chunkCount += 1
+
+      if chunkCount == Recorder.framesPerLevel {
+        levels.append(Waveform.normalize(rms: (chunkSum / Float(chunkCount)).squareRoot()))
+        levelFrames += Int64(chunkCount)
+        chunkSum = 0
+        chunkCount = 0
+      }
     }
 
     stereo.frameLength = mono.frameLength
@@ -272,7 +302,7 @@ private nonisolated final class TapWriter: @unchecked Sendable {
     }
 
     if let frames {
-      onLevel(Waveform.normalize(rms: (sumOfSquares / Float(count)).squareRoot()), frames)
+      onLevels(levels, frames, levelFrames)
     }
   }
 }

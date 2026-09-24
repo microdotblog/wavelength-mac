@@ -53,7 +53,7 @@ struct RecordingPanel: View {
         Text(Formatting.duration(recorder.elapsed))
           .font(.title3.monospacedDigit().weight(.semibold))
           .frame(minWidth: 52, alignment: .leading)
-        LiveWaveformView(levels: recorder.liveLevels)
+        liveWaveform(barWidth: 3, spacing: 2)
           .frame(height: 34)
         pauseButton
         Button("Done", action: finish)
@@ -95,7 +95,7 @@ struct RecordingPanel: View {
         .foregroundStyle(isMine ? Color.ink : Color.inkSoft)
         .contentTransition(.numericText())
 
-      LiveWaveformView(levels: isMine ? recorder.liveLevels : [], barWidth: 4, spacing: 3)
+      liveWaveform(barWidth: 4, spacing: 3)
         .frame(height: 96)
         .frame(maxWidth: 640)
 
@@ -120,7 +120,7 @@ struct RecordingPanel: View {
             Task { await start() }
           }
         } label: {
-          RecordButtonFace(phase: isMine ? recorder.phase : .idle)
+          RecordButtonFace(phase: isMine ? recorder.phase : .idle, level: isMine ? recorder.level : 0)
         }
         .buttonStyle(.plain)
         .keyboardShortcut(.space, modifiers: [])
@@ -159,6 +159,17 @@ struct RecordingPanel: View {
     case .recording: "Recording… press Space to pause."
     case .paused: "Paused. Press Space to resume, or ⌘↩ to save."
     }
+  }
+
+  private func liveWaveform(barWidth: CGFloat, spacing: CGFloat) -> some View {
+    LiveWaveformView(
+      levels: isMine ? recorder.liveLevels : [],
+      endTime: recorder.liveEndTime,
+      receivedAt: recorder.liveReceivedAt,
+      isRunning: isMine && recorder.phase == .recording,
+      barWidth: barWidth,
+      spacing: spacing
+    )
   }
 
   private var pauseButton: some View {
@@ -207,27 +218,52 @@ struct RecordingPanel: View {
 
 private struct RecordButtonFace: View {
   let phase: Recorder.Phase
+  let level: Float
+
+  @Environment(\.colorScheme) private var colorScheme
+  @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
   var body: some View {
     ZStack {
       Circle()
-        .strokeBorder(Color.recording.opacity(0.35), lineWidth: 5)
-        .frame(width: 96, height: 96)
+        .stroke(Color.accentColor, lineWidth: 3)
+        .frame(width: 120, height: 120)
+        .scaleEffect(1 + CGFloat(level) * 0.35)
+        .opacity(phase == .recording ? Double(level) * 0.7 : 0)
+        .animation(.easeOut(duration: 0.12), value: level)
 
-      if phase == .recording {
-        Image(systemName: "pause.fill")
-          .font(.system(size: 32, weight: .bold))
-          .foregroundStyle(.white)
-          .frame(width: 80, height: 80)
-          .background(Color.recording, in: .circle)
-      } else {
-        Circle()
-          .fill(Color.recording)
-          .frame(width: 80, height: 80)
-      }
+      Circle()
+        .fill(Color.accentColor.opacity(colorScheme == .dark ? 0.18 : 0.12))
+        .overlay {
+          Circle().strokeBorder(Color.accentColor, lineWidth: 2)
+        }
+        .overlay {
+          icon
+        }
+        .frame(width: 120, height: 120)
+        .phaseAnimator([1.0, 1.035]) { face, scale in
+          face.scaleEffect(phase == .idle && !reduceMotion ? scale : 1)
+        } animation: { _ in
+          .easeInOut(duration: 1.6)
+        }
     }
+    .frame(width: 160, height: 160)
     .contentShape(.circle)
-    .symbolEffect(.pulse, isActive: phase == .recording)
+  }
+
+  @ViewBuilder
+  private var icon: some View {
+    if phase == .recording {
+      HStack(spacing: 9) {
+        RoundedRectangle(cornerRadius: 4).frame(width: 14, height: 44)
+        RoundedRectangle(cornerRadius: 4).frame(width: 14, height: 44)
+      }
+      .foregroundStyle(Color.accentColor)
+    } else {
+      Circle()
+        .fill(Color.accentColor)
+        .frame(width: 44, height: 44)
+    }
   }
 }
 
@@ -236,7 +272,7 @@ private struct RecordingDot: View {
 
   var body: some View {
     Circle()
-      .fill(isPaused ? Color.inkSoft : Color.recording)
+      .fill(isPaused ? Color.inkSoft : Color.accentColor)
       .frame(width: 10, height: 10)
       .phaseAnimator([1.0, 0.35]) { dot, opacity in
         dot.opacity(isPaused ? 1 : opacity)

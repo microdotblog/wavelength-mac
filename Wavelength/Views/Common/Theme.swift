@@ -9,7 +9,6 @@ extension Color {
   static let inkSoft = Color(light: 0x756657, dark: 0xD9C0A8)
   static let line = Color(red: 1, green: 136 / 255, blue: 0).opacity(0.2)
   static let gold = Color(hex: 0xFFC400)
-  static let recording = Color(red: 0.96, green: 0.26, blue: 0.21)
 
   init(hex: UInt32) {
     self.init(
