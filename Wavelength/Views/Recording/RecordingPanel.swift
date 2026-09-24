@@ -17,6 +17,7 @@ struct RecordingPanel: View {
   @State private var owner = UUID()
   @State private var isConfirmingCancel = false
   @State private var isSaving = false
+  @State private var isPresent = false
 
   private var isMine: Bool { recorder.isOwned(by: owner) }
 
@@ -39,7 +40,10 @@ struct RecordingPanel: View {
         await start()
       }
     }
+    .onAppear { isPresent = true }
     .onDisappear {
+      isPresent = false
+
       if isMine {
         finish()
       }
@@ -182,7 +186,11 @@ struct RecordingPanel: View {
   }
 
   private func start() async {
-    if !(await recorder.start(owner: owner)), let message = recorder.errorMessage {
+    let didStart = await recorder.start(owner: owner)
+
+    if didStart, !isPresent {
+      recorder.cancel()
+    } else if !didStart, let message = recorder.errorMessage {
       toasts.show(message)
     }
   }
