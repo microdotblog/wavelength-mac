@@ -21,7 +21,7 @@ open Wavelength.xcodeproj
 
 Run `xcodegen generate` again after adding or removing files.
 
-Set your team under Signing & Capabilities before running on a Mac other than your own. Debug builds sign to run locally.
+The app is signed with the Micro.blog developer team (`3F9MDJ6K4E`), so you need to be a member of that team in Xcode to build it.
 
 ## Tests
 
