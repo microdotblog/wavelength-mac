@@ -95,7 +95,9 @@ struct EpisodeEditorView: View {
 
   @ToolbarContentBuilder
   private func toolbar(_ episode: Episode) -> some ToolbarContent {
-    ToolbarItemGroup(placement: .primaryAction) {
+    ToolbarSpacer(.flexible)
+
+    ToolbarItemGroup {
       if episode.isPublished {
         if let uid = episode.postID {
           Button {

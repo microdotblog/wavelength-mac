@@ -160,7 +160,9 @@ struct NarrateView: View {
 
   @ToolbarContentBuilder
   private func toolbar(_ post: Post) -> some ToolbarContent {
-    ToolbarItemGroup(placement: .primaryAction) {
+    ToolbarSpacer(.flexible)
+
+    ToolbarItemGroup {
       ControlGroup {
         Button {
           fontSize = max(14, fontSize - 2)
