@@ -127,9 +127,7 @@ struct NarrateView: View {
       Button {
         player.toggle()
       } label: {
-        Image(systemName: player.isPlaying ? "pause.circle.fill" : "play.circle.fill")
-          .font(.system(size: 30))
-          .foregroundStyle(Color.accentColor)
+        PlayPauseCircle(isPlaying: player.isPlaying, size: 30)
       }
       .buttonStyle(.plain)
       .disabled(player.duration <= 0)

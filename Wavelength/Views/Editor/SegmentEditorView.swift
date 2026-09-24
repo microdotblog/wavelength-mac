@@ -293,10 +293,9 @@ struct TransportBar: View {
       Button {
         player.toggle()
       } label: {
-        Image(systemName: player.isPlaying ? "pause.fill" : "play.fill")
-          .font(.title2)
-          .frame(width: 24)
-          .contentTransition(.symbolEffect(.replace))
+        PlayPauseIcon(isPlaying: player.isPlaying, size: 17)
+          .frame(width: 24, height: 24)
+          .contentShape(.rect)
       }
       .disabled(player.duration <= 0)
       .help(player.isPlaying ? "Pause (Space)" : "Play (Space)")

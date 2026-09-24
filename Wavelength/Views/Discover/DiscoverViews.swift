@@ -163,10 +163,7 @@ struct DiscoverRow: View {
       Button {
         nowPlaying.toggle(post)
       } label: {
-        Image(systemName: isCurrent && nowPlaying.isPlaying ? "pause.circle.fill" : "play.circle.fill")
-          .font(.system(size: 26))
-          .foregroundStyle(Color.accentColor)
-          .contentTransition(.symbolEffect(.replace))
+        PlayPauseCircle(isPlaying: isCurrent && nowPlaying.isPlaying, size: 26)
       }
       .buttonStyle(.plain)
       .help(isCurrent && nowPlaying.isPlaying ? "Pause" : "Play")
@@ -298,10 +295,9 @@ struct NowPlayingBar: View {
           .help("Back 15 seconds")
 
         Button { nowPlaying.toggle() } label: {
-          Image(systemName: nowPlaying.isPlaying ? "pause.fill" : "play.fill")
-            .font(.title2)
-            .frame(width: 28)
-            .contentTransition(.symbolEffect(.replace))
+          PlayPauseIcon(isPlaying: nowPlaying.isPlaying, size: 17)
+            .frame(width: 28, height: 28)
+            .contentShape(.rect)
         }
         .buttonStyle(.borderless)
         .help(nowPlaying.isPlaying ? "Pause" : "Play")
