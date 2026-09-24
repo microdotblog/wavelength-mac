@@ -6,6 +6,7 @@ struct WavelengthCommands: Commands {
   @FocusedValue(\.episodeActions) private var episode
   @FocusedValue(\.segmentActions) private var segment
   @FocusedValue(\.recordingActions) private var recording
+  @FocusedValue(\.startRecording) private var startRecording
   @Environment(\.openWindow) private var openWindow
 
   var body: some Commands {
@@ -36,6 +37,10 @@ struct WavelengthCommands: Commands {
         .disabled(segment?.split == nil)
 
       Divider()
+
+      Button("Record") { startRecording?.start() }
+        .keyboardShortcut("r")
+        .disabled(startRecording == nil)
 
       Button("Pause/Resume Recording") { recording?.togglePause() }
         .keyboardShortcut("r", modifiers: [.command, .shift])

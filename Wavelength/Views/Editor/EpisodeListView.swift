@@ -117,7 +117,7 @@ struct EpisodeRow: View {
       WaveformView(levels: episode.waveform, barWidth: 2, spacing: 1)
         .frame(width: 56, height: 32)
         .padding(6)
-        .background(Color.paperAlt, in: .rect(cornerRadius: 8))
+        .background(.quaternary, in: .rect(cornerRadius: 8))
 
       VStack(alignment: .leading, spacing: 3) {
         HStack(spacing: 6) {

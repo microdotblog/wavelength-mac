@@ -11,7 +11,7 @@ struct RootView: View {
       } else if session.isSignedIn {
         MainView()
       } else {
-        Color.canvas
+        Color.clear
       }
     }
     .overlay { ToastOverlay() }
@@ -82,7 +82,6 @@ private struct MainView: View {
           actionTitle: "New Episode",
           action: model.startNewEpisode
         )
-        .background(Color.canvas)
       }
     case .narrations, .posts:
       if let uid = model.selectedPostUID {
@@ -94,15 +93,13 @@ private struct MainView: View {
           title: "Narrate a Post",
           message: "Pick a post to read it aloud. Wavelength attaches your narration to the post on Micro.blog."
         )
-        .background(Color.canvas)
       }
     case .discover, .listenLater:
       if let id = model.selectedDiscoverID {
         DiscoverDetailView(postID: id)
       } else {
         EmptyStateView(symbol: "sparkles", title: "Pick an Episode", message: "Choose a podcast to see its details. Double-click to play.")
-          .background(Color.canvas)
-      }
+        }
     }
   }
 }

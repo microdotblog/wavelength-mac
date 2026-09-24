@@ -194,7 +194,7 @@ struct DiscoverDetailView: View {
             VStack(alignment: .leading, spacing: 10) {
               Text(post.displayTitle)
                 .font(.title.weight(.bold))
-                .foregroundStyle(Color.ink)
+                .foregroundStyle(.primary)
                 .textSelection(.enabled)
 
               Button {
@@ -246,7 +246,7 @@ struct DiscoverDetailView: View {
           if !post.displaySummary.isEmpty {
             Text(post.displaySummary)
               .font(.body)
-              .foregroundStyle(Color.ink)
+              .foregroundStyle(.primary)
               .textSelection(.enabled)
               .frame(maxWidth: 640, alignment: .leading)
           }
@@ -254,7 +254,6 @@ struct DiscoverDetailView: View {
         .padding(28)
         .frame(maxWidth: .infinity, alignment: .leading)
       }
-      .background(Color.canvas)
       .navigationTitle(post.sourceLabel)
     } else {
       EmptyStateView(symbol: "sparkles", title: "Pick an Episode", message: "Choose a podcast to see its details.")

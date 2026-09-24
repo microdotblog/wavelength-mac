@@ -1,16 +1,18 @@
 import SwiftUI
 
-struct RecordingPanel: View {
-  enum Style {
-    case compact
-    case hero
-  }
+enum RecordingPanelStyle {
+  case compact
+  case bar
+  case hero
+}
 
-  var idleTitle = "Record Segment"
-  var style: Style = .compact
-  var autoStart = false
+struct RecordingPanel<Accessory: View>: View {
+  var idleTitle: String
+  var style: RecordingPanelStyle
+  var autoStart: Bool
   let onFinish: (RecordedTake) async throws -> Void
   var onCancel: (() -> Void)?
+  let accessory: Accessory
 
   @Environment(Recorder.self) private var recorder
   @Environment(Toasts.self) private var toasts
@@ -21,14 +23,32 @@ struct RecordingPanel: View {
 
   private var isMine: Bool { recorder.isOwned(by: owner) }
 
+  init(
+    idleTitle: String = "Record",
+    style: RecordingPanelStyle = .compact,
+    autoStart: Bool = false,
+    onFinish: @escaping (RecordedTake) async throws -> Void,
+    onCancel: (() -> Void)? = nil,
+    @ViewBuilder accessory: () -> Accessory
+  ) {
+    self.idleTitle = idleTitle
+    self.style = style
+    self.autoStart = autoStart
+    self.onFinish = onFinish
+    self.onCancel = onCancel
+    self.accessory = accessory()
+  }
+
   var body: some View {
     Group {
       switch style {
       case .compact: compact
+      case .bar: bar
       case .hero: hero
       }
     }
     .focusedSceneValue(\.recordingActions, isMine ? RecordingActions(togglePause: { recorder.togglePause() }, finish: { finish() }) : nil)
+    .focusedSceneValue(\.startRecording, canStart ? StartRecordingAction { Task { await start() } } : nil)
     .confirmationDialog("Discard this recording?", isPresented: $isConfirmingCancel) {
       Button("Discard Recording", role: .destructive, action: cancel)
       Button("Keep Recording", role: .cancel) {}
@@ -53,29 +73,9 @@ struct RecordingPanel: View {
   private var compact: some View {
     HStack(spacing: 12) {
       if isMine {
-        RecordingDot(isPaused: recorder.phase == .paused)
-        Text(Formatting.duration(recorder.elapsed))
-          .font(.title3.monospacedDigit().weight(.semibold))
-          .frame(minWidth: 52, alignment: .leading)
-        liveWaveform(barWidth: 3, spacing: 2)
-          .frame(height: 34)
-        pauseButton
-        Button("Done", action: finish)
-          .buttonStyle(.borderedProminent)
-          .keyboardShortcut(.return, modifiers: [.command])
-        Button {
-          isConfirmingCancel = true
-        } label: {
-          Image(systemName: "xmark")
-        }
-        .help("Discard recording")
+        liveStrip
       } else {
-        Button {
-          Task { await start() }
-        } label: {
-          Label(idleTitle, systemImage: "record.circle")
-        }
-        .disabled(recorder.isActive || isSaving)
+        recordButton
 
         InputDeviceMenu()
 
@@ -88,15 +88,63 @@ struct RecordingPanel: View {
         }
       }
     }
-    .padding(12)
-    .card()
+  }
+
+  private var bar: some View {
+    HStack(spacing: 12) {
+      if isMine {
+        liveStrip
+      } else {
+        recordButton
+        InputDeviceMenu()
+        accessory
+      }
+    }
+    .frame(minHeight: 32)
+  }
+
+  private var liveStrip: some View {
+    HStack(spacing: 12) {
+      RecordingDot(isPaused: recorder.phase == .paused)
+      Text(Formatting.duration(recorder.elapsed))
+        .font(.body.monospacedDigit().weight(.semibold))
+        .frame(minWidth: 44, alignment: .leading)
+      liveWaveform(barWidth: 3, spacing: 2)
+        .frame(height: 28)
+      pauseButton
+      Button("Discard", role: .destructive) {
+        isConfirmingCancel = true
+      }
+      .help("Discard recording")
+      Button("Done", action: finish)
+        .buttonStyle(.borderedProminent)
+        .keyboardShortcut(.return, modifiers: [.command])
+        .help("Finish recording (⌘↩)")
+    }
+  }
+
+  private var recordButton: some View {
+    Button {
+      Task { await start() }
+    } label: {
+      Label(idleTitle, systemImage: "record.circle")
+        .labelStyle(.titleAndIcon)
+    }
+    .buttonStyle(.borderless)
+    .tint(Color.accentColor)
+    .disabled(!canStart)
+    .help("\(idleTitle) (⌘R)")
+  }
+
+  private var canStart: Bool {
+    !recorder.isActive && !isSaving
   }
 
   private var hero: some View {
     VStack(spacing: 28) {
       Text(isMine ? Formatting.duration(recorder.elapsed) : "0:00")
         .font(.system(size: 64, weight: .semibold, design: .rounded).monospacedDigit())
-        .foregroundStyle(isMine ? Color.ink : Color.inkSoft)
+        .foregroundStyle(isMine ? .primary : .secondary)
         .contentTransition(.numericText())
 
       liveWaveform(barWidth: 4, spacing: 3)
@@ -182,7 +230,8 @@ struct RecordingPanel: View {
     } label: {
       Image(systemName: recorder.phase == .paused ? "record.circle" : "pause.fill")
     }
-    .help(recorder.phase == .paused ? "Resume" : "Pause")
+    .buttonStyle(.borderless)
+    .help(recorder.phase == .paused ? "Resume (⇧⌘R)" : "Pause (⇧⌘R)")
   }
 
   private func start() async {
@@ -280,7 +329,7 @@ private struct RecordingDot: View {
 
   var body: some View {
     Circle()
-      .fill(isPaused ? Color.inkSoft : Color.accentColor)
+      .fill(isPaused ? Color.secondary : Color.accentColor)
       .frame(width: 10, height: 10)
       .phaseAnimator([1.0, 0.35]) { dot, opacity in
         dot.opacity(isPaused ? 1 : opacity)
@@ -330,11 +379,30 @@ struct InputDeviceMenu: View {
   }
 }
 
+struct StartRecordingAction {
+  let start: () -> Void
+}
+
 struct RecordingActions {
   let togglePause: () -> Void
   let finish: () -> Void
 }
 
+extension RecordingPanel where Accessory == EmptyView {
+  init(
+    idleTitle: String = "Record",
+    style: RecordingPanelStyle = .compact,
+    autoStart: Bool = false,
+    onFinish: @escaping (RecordedTake) async throws -> Void,
+    onCancel: (() -> Void)? = nil
+  ) {
+    self.init(idleTitle: idleTitle, style: style, autoStart: autoStart, onFinish: onFinish, onCancel: onCancel) {
+      EmptyView()
+    }
+  }
+}
+
 extension FocusedValues {
   @Entry var recordingActions: RecordingActions?
+  @Entry var startRecording: StartRecordingAction?
 }

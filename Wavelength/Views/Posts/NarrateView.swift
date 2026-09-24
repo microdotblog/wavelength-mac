@@ -263,7 +263,7 @@ struct ScrubBar: View {
   var body: some View {
     GeometryReader { geometry in
       ZStack(alignment: .leading) {
-        Capsule().fill(Color.inkSoft.opacity(0.25))
+        Capsule().fill(Color.secondary.opacity(0.25))
         Capsule().fill(Color.accentColor)
           .frame(width: max(4, geometry.size.width * progress))
       }

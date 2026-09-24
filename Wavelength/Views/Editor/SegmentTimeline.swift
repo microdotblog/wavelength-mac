@@ -5,35 +5,41 @@ struct SegmentTimeline: View {
   let folder: URL?
   let player: SegmentPlayer
   var selectedSegment: String?
-  var height: CGFloat = 120
+  var height: CGFloat = 150
 
   @State private var hoverLocation: CGFloat?
-  private let gap: CGFloat = 3
+  private let gap: CGFloat = 2
+  private let rulerHeight: CGFloat = 20
 
   var body: some View {
     GeometryReader { geometry in
       let layout = TimelineLayout(segments: segments, player: player, width: geometry.size.width, gap: gap)
+      let regionHeight = geometry.size.height - rulerHeight
 
       ZStack(alignment: .topLeading) {
+        TimeRuler(layout: layout, duration: layout.times.last.map { $0 + (layout.durations.last ?? 0) } ?? 0)
+          .frame(height: rulerHeight)
+
         ForEach(Array(segments.enumerated()), id: \.element.id) { index, clip in
           let frame = layout.frame(of: index)
-          segmentBlock(clip, index: index, layout: layout)
-            .frame(width: max(frame.width, 1), height: geometry.size.height)
-            .offset(x: frame.minX)
+          region(clip, index: index, layout: layout)
+            .frame(width: max(frame.width, 1), height: regionHeight)
+            .offset(x: frame.minX, y: rulerHeight)
         }
 
         if let hoverLocation {
           Rectangle()
-            .fill(Color.inkSoft.opacity(0.35))
-            .frame(width: 1, height: geometry.size.height)
-            .offset(x: hoverLocation)
+            .fill(Color.secondary.opacity(0.5))
+            .frame(width: 1, height: regionHeight)
+            .offset(x: hoverLocation, y: rulerHeight)
 
           Text(Formatting.preciseDuration(layout.time(at: hoverLocation)))
-            .font(.caption2.monospacedDigit().weight(.semibold))
+            .font(.caption2.monospacedDigit())
             .padding(.horizontal, 5)
-            .padding(.vertical, 2)
-            .background(.regularMaterial, in: .capsule)
-            .offset(x: min(max(hoverLocation - 24, 0), geometry.size.width - 56), y: -4)
+            .padding(.vertical, 1)
+            .background(.background, in: .rect(cornerRadius: 4))
+            .overlay { RoundedRectangle(cornerRadius: 4).strokeBorder(.separator) }
+            .offset(x: min(max(hoverLocation + 4, 0), geometry.size.width - 52), y: rulerHeight + 4)
         }
 
         Playhead(height: geometry.size.height)
@@ -67,12 +73,12 @@ struct SegmentTimeline: View {
     }
   }
 
-  private func segmentBlock(_ clip: ClipMeta, index: Int, layout: TimelineLayout) -> some View {
+  private func region(_ clip: ClipMeta, index: Int, layout: TimelineLayout) -> some View {
     let isSelected = clip.name == selectedSegment
     let levels = folder.map { WaveformCache.shared.levels(for: $0.appending(path: clip.name), clip: clip) } ?? clip.waveform
 
-    return RoundedRectangle(cornerRadius: 8)
-      .fill(Color.paperAlt)
+    return RoundedRectangle(cornerRadius: 6)
+      .fill(Color.accentColor.opacity(isSelected ? 0.14 : 0.07))
       .overlay {
         WaveformView(
           levels: levels,
@@ -80,19 +86,65 @@ struct SegmentTimeline: View {
           barWidth: 2,
           spacing: 1
         )
-        .padding(.vertical, 12)
+        .padding(.top, 18)
+        .padding(.bottom, 8)
         .padding(.horizontal, 4)
       }
       .overlay(alignment: .topLeading) {
-        Text("\(index + 1)")
-          .font(.caption2.weight(.bold).monospacedDigit())
-          .foregroundStyle(Color.inkSoft)
-          .padding(5)
+        Text("Segment \(index + 1)")
+          .font(.caption2.weight(.medium))
+          .foregroundStyle(.secondary)
+          .lineLimit(1)
+          .padding(.horizontal, 6)
+          .padding(.vertical, 3)
       }
       .overlay {
-        RoundedRectangle(cornerRadius: 8)
-          .strokeBorder(isSelected ? Color.accentColor : Color.line, lineWidth: isSelected ? 2 : 1)
+        RoundedRectangle(cornerRadius: 6)
+          .strokeBorder(isSelected ? Color.accentColor.opacity(0.8) : Color(nsColor: .separatorColor), lineWidth: 1)
       }
+  }
+}
+
+private struct TimeRuler: View {
+  let layout: TimelineLayout
+  let duration: Double
+
+  private static let intervals: [Double] = [1, 2, 5, 10, 15, 30, 60, 120, 300, 600, 900, 1_800, 3_600]
+
+  var body: some View {
+    Canvas { context, size in
+      guard duration > 0, size.width > 0 else { return }
+
+      let pointsPerSecond = size.width / duration
+      let major = Self.intervals.first { $0 * pointsPerSecond >= 64 } ?? Self.intervals.last!
+      let minor = major / 5
+      let showsMinor = minor * pointsPerSecond >= 8
+      let step = showsMinor ? minor : major
+      var time = 0.0
+      var index = 0
+
+      while time <= duration + 0.001 {
+        let x = layout.x(at: time).rounded() + 0.5
+        let isMajor = index % (showsMinor ? 5 : 1) == 0
+        let tickHeight: CGFloat = isMajor ? 7 : 3
+        var tick = Path()
+        tick.move(to: CGPoint(x: x, y: size.height - tickHeight))
+        tick.addLine(to: CGPoint(x: x, y: size.height))
+        context.stroke(tick, with: .color(.secondary.opacity(isMajor ? 0.7 : 0.4)), lineWidth: 1)
+
+        if isMajor {
+          context.draw(
+            Text(Formatting.duration(time)).font(.caption2.monospacedDigit()).foregroundStyle(.secondary),
+            at: CGPoint(x: x + 3, y: 1),
+            anchor: .topLeading
+          )
+        }
+
+        index += 1
+        time = Double(index) * step
+      }
+    }
+    .accessibilityHidden(true)
   }
 }
 
@@ -107,7 +159,7 @@ private struct Playhead: View {
         .frame(width: 12, height: 8)
       Rectangle()
         .fill(Color.accentColor)
-        .frame(width: 2, height: height - 8)
+        .frame(width: 1.5, height: height - 8)
     }
     .frame(width: 12)
   }

@@ -13,21 +13,18 @@ struct EpisodeEditorView: View {
   @State private var isRenaming = false
   @State private var isConfirmingDelete = false
   @State private var isExporting = false
-  @FocusState private var isTitleFocused: Bool
 
   var body: some View {
     Group {
       if let episode = library.episode(episodeID), let document {
-        ScrollView {
-          VStack(alignment: .leading, spacing: 20) {
-            header(episode)
-            SegmentEditorView(editor: document, player: player)
+        VStack(spacing: 0) {
+          if episode.isOverUploadLimit {
+            uploadLimitBanner(episode)
           }
-          .padding(24)
-          .frame(maxWidth: 980)
-          .frame(maxWidth: .infinity)
+
+          SegmentEditorView(editor: document, player: player)
         }
-        .background(Color.canvas)
+        .navigationSubtitle(subtitle(episode))
         .toolbar { toolbar(episode) }
         .focusedSceneValue(\.episodeActions, actions(for: episode))
         .onKeyPress(.space) {
@@ -35,6 +32,11 @@ struct EpisodeEditorView: View {
           return .handled
         }
         .episodeDeleteDialog(episode: episode, isPresented: $isConfirmingDelete)
+        .alert("Rename Episode", isPresented: $isRenaming) {
+          TextField("Episode name", text: $titleDraft)
+          Button("Rename", action: commitRename)
+          Button("Cancel", role: .cancel) {}
+        }
       } else {
         EmptyStateView(symbol: "waveform", title: "Episode Unavailable", message: "This episode is no longer available.")
       }
@@ -48,48 +50,17 @@ struct EpisodeEditorView: View {
     }
   }
 
-  private func header(_ episode: Episode) -> some View {
-    VStack(alignment: .leading, spacing: 8) {
-      if isRenaming {
-        TextField("Episode name", text: $titleDraft)
-          .textFieldStyle(.plain)
-          .font(.largeTitle.weight(.bold))
-          .focused($isTitleFocused)
-          .onSubmit(commitRename)
-          .onExitCommand { isRenaming = false }
-          .onChange(of: isTitleFocused) { _, focused in
-            if !focused { commitRename() }
-          }
-      } else {
-        Text(episode.title)
-          .font(.largeTitle.weight(.bold))
-          .foregroundStyle(Color.ink)
-          .onTapGesture(count: 2, perform: startRename)
-          .help("Double-click to rename")
-      }
+  private func uploadLimitBanner(_ episode: Episode) -> some View {
+    VStack(spacing: 0) {
+      Label(Formatting.uploadLimitMessage(episode.totalSizeBytes), systemImage: "exclamationmark.triangle.fill")
+        .font(.callout)
+        .symbolRenderingMode(.multicolor)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 20)
+        .padding(.vertical, 8)
+        .background(Color.yellow.opacity(0.12))
 
-      HStack(spacing: 10) {
-        Text(metadata(episode))
-          .foregroundStyle(Color.inkSoft)
-
-        if episode.isPublished {
-          Button {
-            if let url = episode.postURL.flatMap(URL.init(string:)) { openURL(url) }
-          } label: {
-            Label("Published", systemImage: "checkmark.seal.fill")
-          }
-          .buttonStyle(.plain)
-          .foregroundStyle(Color.accentColor)
-          .help("View the post on Micro.blog")
-        }
-      }
-      .font(.callout)
-
-      if episode.isOverUploadLimit {
-        Label(Formatting.uploadLimitMessage(episode.totalSizeBytes), systemImage: "exclamationmark.triangle.fill")
-          .font(.callout)
-          .foregroundStyle(Color.orange)
-      }
+      Divider()
     }
   }
 
@@ -124,16 +95,17 @@ struct EpisodeEditorView: View {
     }
   }
 
-  private func metadata(_ episode: Episode) -> String {
-    var parts: [String] = []
+  private func subtitle(_ episode: Episode) -> String {
+    var parts = [
+      Formatting.duration(episode.durationSeconds),
+      episode.clips.count == 1 ? "1 segment" : "\(episode.clips.count) segments",
+      Formatting.fileSize(episode.totalSizeBytes),
+    ]
 
-    if let date = episode.publishedAt ?? episode.createdAt {
-      parts.append(date.formatted(date: .abbreviated, time: .shortened))
+    if episode.isPublished {
+      parts.append("Published")
     }
 
-    parts.append(Formatting.duration(episode.durationSeconds))
-    parts.append(episode.clips.count == 1 ? "1 segment" : "\(episode.clips.count) segments")
-    parts.append(Formatting.fileSize(episode.totalSizeBytes))
     return parts.joined(separator: " · ")
   }
 
@@ -151,13 +123,9 @@ struct EpisodeEditorView: View {
     guard let episode = library.episode(episodeID) else { return }
     titleDraft = episode.title
     isRenaming = true
-    isTitleFocused = true
   }
 
   private func commitRename() {
-    guard isRenaming else { return }
-    isRenaming = false
-
     do {
       try library.rename(episodeID, to: titleDraft)
     } catch {

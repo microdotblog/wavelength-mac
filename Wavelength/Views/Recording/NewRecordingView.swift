@@ -11,10 +11,10 @@ struct NewRecordingView: View {
 
       Text("New Episode")
         .font(.title.weight(.bold))
-        .foregroundStyle(Color.ink)
+        .foregroundStyle(.primary)
 
       Text("Record the first segment. You can add more, split, and reorder them afterwards.")
-        .foregroundStyle(Color.inkSoft)
+        .foregroundStyle(.secondary)
         .multilineTextAlignment(.center)
         .frame(maxWidth: 420)
         .padding(.bottom, 24)
@@ -29,7 +29,6 @@ struct NewRecordingView: View {
     }
     .padding(32)
     .frame(maxWidth: .infinity, maxHeight: .infinity)
-    .background(Color.canvas)
     .navigationTitle("New Episode")
     .toolbar {
       ToolbarItem(placement: .cancellationAction) {

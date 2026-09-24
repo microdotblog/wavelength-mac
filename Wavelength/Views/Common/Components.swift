@@ -53,7 +53,7 @@ struct ArtworkView: View {
         image.resizable().scaledToFill()
       } else {
         ZStack {
-          Color.paperAlt
+          Rectangle().fill(.quaternary)
           Image(systemName: "waveform")
             .font(.system(size: size * 0.4, weight: .semibold))
             .foregroundStyle(Color.accentColor)

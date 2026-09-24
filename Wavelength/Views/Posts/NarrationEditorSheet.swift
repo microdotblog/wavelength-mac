@@ -30,10 +30,7 @@ struct NarrationEditorSheet: View {
 
       Group {
         if draft.isOpen(for: postUID) {
-          ScrollView {
-            SegmentEditorView(editor: draft, player: player)
-              .padding(20)
-          }
+          SegmentEditorView(editor: draft, player: player)
         } else {
           VStack(spacing: 12) {
             ProgressView()
@@ -43,7 +40,6 @@ struct NarrationEditorSheet: View {
           .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
       }
-      .background(Color.canvas)
 
       Divider()
 

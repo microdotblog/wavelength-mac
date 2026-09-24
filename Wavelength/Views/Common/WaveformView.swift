@@ -6,7 +6,7 @@ struct WaveformView: View {
   var barWidth: CGFloat = 2
   var spacing: CGFloat = 1.5
   var played: Color = .accentColor
-  var unplayed: Color = .inkSoft.opacity(0.35)
+  var unplayed: Color = Color(nsColor: .tertiaryLabelColor)
   var minimumBar: CGFloat = 1.5
 
   var body: some View {

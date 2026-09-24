@@ -4,7 +4,7 @@ import UniformTypeIdentifiers
 struct SegmentEditorView: View {
   let editor: any SegmentEditing
   let player: SegmentPlayer
-  var recordTitle = "Record Segment"
+  var recordTitle = "Record"
 
   @Environment(Toasts.self) private var toasts
   @State private var selectedSegment: String?
@@ -17,12 +17,32 @@ struct SegmentEditorView: View {
   }
 
   var body: some View {
-    VStack(alignment: .leading, spacing: 16) {
-      timelineCard
-
-      if !editor.isLocked {
-        RecordingPanel(idleTitle: recordTitle, onFinish: appendRecording)
+    VStack(spacing: 0) {
+      SegmentTimeline(
+        segments: editor.segments,
+        folder: editor.segmentFolder,
+        player: player,
+        selectedSegment: selectedSegment ?? currentSegment?.name
+      )
+      .padding(.horizontal, 20)
+      .padding(.top, 14)
+      .padding(.bottom, 16)
+      .overlay(alignment: .topTrailing) {
+        if editor.isWorking || player.isLoading {
+          ProgressView()
+            .controlSize(.small)
+            .padding(.trailing, 20)
+            .padding(.top, 14)
+        }
       }
+
+      Divider()
+
+      controlBar
+        .padding(.horizontal, 16)
+        .padding(.vertical, 8)
+
+      Divider()
 
       segmentList
     }
@@ -45,27 +65,20 @@ struct SegmentEditorView: View {
     }
   }
 
-  private var timelineCard: some View {
-    VStack(spacing: 14) {
-      SegmentTimeline(
-        segments: editor.segments,
-        folder: editor.segmentFolder,
-        player: player,
-        selectedSegment: selectedSegment ?? currentSegment?.name
-      )
-      TransportBar(player: player, segmentCount: editor.segments.count, canSplit: canSplit, split: splitAtPlayhead)
-    }
-    .padding(16)
-    .card()
-    .overlay(alignment: .topTrailing) {
-      if editor.isWorking || player.isLoading {
-        ProgressView()
-          .controlSize(.small)
-          .padding(8)
-          .background(.regularMaterial, in: .capsule)
-          .padding(10)
+  @ViewBuilder
+  private var controlBar: some View {
+    if editor.isLocked {
+      transport
+    } else {
+      RecordingPanel(idleTitle: recordTitle, style: .bar, onFinish: appendRecording) {
+        transport
       }
     }
+  }
+
+  private var transport: some View {
+    let splitAction: (() -> Void)? = editor.isLocked ? nil : { splitAtPlayhead() }
+    return TransportBar(player: player, canSplit: canSplit, split: splitAction)
   }
 
   private var segmentActions: SegmentActions {
@@ -91,53 +104,44 @@ struct SegmentEditorView: View {
   }
 
   private var segmentList: some View {
-    VStack(alignment: .leading, spacing: 8) {
-      HStack {
-        Text(editor.segments.count == 1 ? "1 Segment" : "\(editor.segments.count) Segments")
-          .font(.headline)
-
-        Spacer()
-
-        if !editor.isLocked {
-          Button {
-            isImporting = true
-          } label: {
-            Label("Add Audio File…", systemImage: "plus")
+    List(selection: $selectedSegment) {
+      Section {
+        ForEach(Array(editor.segments.enumerated()), id: \.element.id) { index, clip in
+          SegmentRow(
+            clip: clip,
+            index: index,
+            isPlaying: player.isPlaying && player.currentSegmentIndex == index
+          )
+          .tag(clip.name)
+          .contextMenu { menu(for: clip, index: index) }
+        }
+        .onMove(perform: moveAction)
+      } header: {
+        HStack {
+          Text("Segments")
+          Spacer()
+          if !editor.isLocked {
+            Button("Add Audio File…", systemImage: "plus") { isImporting = true }
+              .buttonStyle(.borderless)
+              .labelStyle(.titleAndIcon)
+              .disabled(editor.isWorking)
           }
-          .buttonStyle(.borderless)
-          .disabled(editor.isWorking)
+        }
+      } footer: {
+        if editor.isLocked {
+          Label("This episode is published, so its audio is locked. Duplicate it to make changes.", systemImage: "lock")
+            .foregroundStyle(.secondary)
         }
       }
-
-      segmentRows
-
-      if editor.isLocked {
-        Label("This episode is published, so its audio is locked. Duplicate it to make changes.", systemImage: "lock")
-          .font(.callout)
-          .foregroundStyle(.secondary)
-      }
     }
-  }
-
-  private var segmentRows: some View {
-    List(selection: $selectedSegment) {
-      ForEach(Array(editor.segments.enumerated()), id: \.element.id) { index, clip in
-        SegmentRow(
-          clip: clip,
-          index: index,
-          folder: editor.segmentFolder,
-          isPlaying: player.isPlaying && player.currentSegmentIndex == index
-        )
-        .tag(clip.name)
-        .contextMenu { menu(for: clip, index: index) }
-      }
-      .onMove(perform: moveAction)
-    }
-    .listStyle(.inset)
-    .scrollContentBackground(.hidden)
-    .frame(minHeight: CGFloat(min(max(editor.segments.count, 2), 6)) * 54)
-    .card()
+    .listStyle(.inset(alternatesRowBackgrounds: true))
     .onDeleteCommand(perform: deleteSelected)
+    .contextMenu(forSelectionType: String.self) { _ in
+    } primaryAction: { names in
+      if let name = names.first, let index = editor.segments.firstIndex(where: { $0.name == name }) {
+        player.play(segment: index)
+      }
+    }
   }
 
   private var moveAction: ((IndexSet, Int) -> Void)? {
@@ -234,96 +238,90 @@ struct SegmentEditorView: View {
 private struct SegmentRow: View {
   let clip: ClipMeta
   let index: Int
-  let folder: URL?
   let isPlaying: Bool
 
   var body: some View {
-    HStack(spacing: 12) {
+    HStack(spacing: 10) {
       Text("\(index + 1)")
-        .font(.callout.weight(.bold).monospacedDigit())
-        .foregroundStyle(Color.accentColor)
-        .frame(width: 26, height: 26)
-        .background(Color.accentColor.opacity(0.12), in: .circle)
+        .monospacedDigit()
+        .foregroundStyle(.secondary)
+        .frame(width: 22, alignment: .trailing)
 
       WaveformView(levels: clip.waveform, barWidth: 2, spacing: 1)
-        .frame(width: 140, height: 26)
+        .frame(width: 120, height: 18)
 
-      VStack(alignment: .leading, spacing: 2) {
-        Text("Segment \(index + 1)")
-          .font(.body.weight(.medium))
-        Text("\(Formatting.duration(clip.durationSeconds)) · \(Formatting.fileSize(clip.sizeBytes))")
-          .font(.caption.monospacedDigit())
-          .foregroundStyle(.secondary)
-      }
-
-      Spacer()
+      Text("Segment \(index + 1)")
 
       if isPlaying {
         Image(systemName: "speaker.wave.2.fill")
           .foregroundStyle(Color.accentColor)
           .symbolEffect(.variableColor.iterative, isActive: true)
       }
+
+      Spacer()
+
+      Text(Formatting.duration(clip.durationSeconds))
+        .monospacedDigit()
+        .foregroundStyle(.secondary)
+
+      Text(Formatting.fileSize(clip.sizeBytes))
+        .monospacedDigit()
+        .foregroundStyle(.secondary)
+        .frame(width: 64, alignment: .trailing)
     }
-    .padding(.vertical, 4)
+    .padding(.vertical, 2)
   }
 }
 
 struct TransportBar: View {
   let player: SegmentPlayer
-  var segmentCount = 1
   var canSplit = false
   var split: (() -> Void)?
 
   var body: some View {
-    HStack(spacing: 14) {
+    HStack(spacing: 16) {
+      Spacer(minLength: 0)
+
       Button {
         player.skip(by: -15)
       } label: {
         Image(systemName: "gobackward.15")
       }
-      .buttonStyle(.borderless)
       .help("Back 15 seconds")
 
       Button {
         player.toggle()
       } label: {
-        Image(systemName: player.isPlaying ? "pause.circle.fill" : "play.circle.fill")
-          .font(.system(size: 34))
-          .foregroundStyle(Color.accentColor)
+        Image(systemName: player.isPlaying ? "pause.fill" : "play.fill")
+          .font(.title2)
+          .frame(width: 24)
           .contentTransition(.symbolEffect(.replace))
       }
-      .buttonStyle(.plain)
       .disabled(player.duration <= 0)
-      .help(player.isPlaying ? "Pause" : "Play")
+      .help(player.isPlaying ? "Pause (Space)" : "Play (Space)")
 
       Button {
         player.skip(by: 15)
       } label: {
         Image(systemName: "goforward.15")
       }
-      .buttonStyle(.borderless)
       .help("Forward 15 seconds")
+
+      Spacer(minLength: 0)
 
       Text("\(Formatting.preciseDuration(player.currentTime)) / \(Formatting.duration(player.duration))")
         .font(.callout.monospacedDigit())
         .foregroundStyle(.secondary)
 
-      if segmentCount > 1, let index = player.currentSegmentIndex {
-        Text("Segment \(index + 1) of \(segmentCount)")
-          .font(.callout)
-          .foregroundStyle(.tertiary)
-      }
-
-      Spacer()
-
       if let split {
         Button(action: split) {
-          Label("Split", systemImage: "scissors")
+          Image(systemName: "scissors")
         }
         .disabled(!canSplit)
-        .help("Split the segment at the playhead (⌘T)")
+        .help("Split at Playhead (⌘T)")
       }
     }
+    .buttonStyle(.borderless)
     .font(.title3)
   }
 }
