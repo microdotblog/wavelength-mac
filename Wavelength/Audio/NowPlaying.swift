@@ -90,10 +90,8 @@ final class NowPlaying {
       duration = Double(post.durationSeconds)
       artwork = nil
       let item = AVPlayerItem(url: url)
-      statusObservation = item.observe(\.status) { [weak self] item, _ in
-        Task { @MainActor in
-          self?.itemStatusChanged()
-        }
+      statusObservation = Self.observeStatus(of: item) { [weak self] in
+        self?.itemStatusChanged()
       }
       player.replaceCurrentItem(with: item)
       loadArtwork(for: post)
@@ -174,13 +172,28 @@ final class NowPlaying {
 
     Task {
       guard let (data, _) = try? await HTTP.session.data(from: url),
-            let image = NSImage(data: data),
+            let size = NSImage(data: data)?.size,
             self.post?.id == post.id else {
         return
       }
 
-      artwork = MPMediaItemArtwork(boundsSize: image.size) { _ in image }
+      artwork = Self.artwork(from: data, size: size)
       updateNowPlayingInfo()
+    }
+  }
+
+  nonisolated static func artwork(from data: Data, size: CGSize) -> MPMediaItemArtwork {
+    MPMediaItemArtwork(boundsSize: size) { _ in
+      NSImage(data: data) ?? NSImage(size: size)
+    }
+  }
+
+  nonisolated private static func observeStatus(
+    of item: AVPlayerItem,
+    onChange: @escaping @MainActor @Sendable () -> Void
+  ) -> NSKeyValueObservation {
+    item.observe(\.status) { _, _ in
+      Task { @MainActor in onChange() }
     }
   }
 
@@ -210,35 +223,31 @@ final class NowPlaying {
     center.skipForwardCommand.preferredIntervals = [30]
     center.skipBackwardCommand.preferredIntervals = [15]
 
-    center.playCommand.addTarget { [weak self] _ in
-      MainActor.assumeIsolated { self?.resume() }
+    Self.handle(center.playCommand) { [weak self] in self?.resume() }
+    Self.handle(center.pauseCommand) { [weak self] in self?.pause() }
+    Self.handle(center.togglePlayPauseCommand) { [weak self] in self?.toggle() }
+    Self.handle(center.skipForwardCommand) { [weak self] in self?.skip(by: 30) }
+    Self.handle(center.skipBackwardCommand) { [weak self] in self?.skip(by: -15) }
+    Self.handleSeek(center.changePlaybackPositionCommand) { [weak self] position in self?.seek(to: position) }
+  }
+
+  nonisolated private static func handle(_ command: MPRemoteCommand, action: @escaping @MainActor @Sendable () -> Void) {
+    command.addTarget { _ in
+      Task { @MainActor in action() }
       return .success
     }
+  }
 
-    center.pauseCommand.addTarget { [weak self] _ in
-      MainActor.assumeIsolated { self?.pause() }
-      return .success
-    }
+  nonisolated private static func handleSeek(
+    _ command: MPChangePlaybackPositionCommand,
+    action: @escaping @MainActor @Sendable (TimeInterval) -> Void
+  ) {
+    command.addTarget { event in
+      guard let position = (event as? MPChangePlaybackPositionCommandEvent)?.positionTime else {
+        return .commandFailed
+      }
 
-    center.togglePlayPauseCommand.addTarget { [weak self] _ in
-      MainActor.assumeIsolated { self?.toggle() }
-      return .success
-    }
-
-    center.skipForwardCommand.addTarget { [weak self] _ in
-      MainActor.assumeIsolated { self?.skip(by: 30) }
-      return .success
-    }
-
-    center.skipBackwardCommand.addTarget { [weak self] _ in
-      MainActor.assumeIsolated { self?.skip(by: -15) }
-      return .success
-    }
-
-    center.changePlaybackPositionCommand.addTarget { [weak self] event in
-      guard let event = event as? MPChangePlaybackPositionCommandEvent else { return .commandFailed }
-      let position = event.positionTime
-      MainActor.assumeIsolated { self?.seek(to: position) }
+      Task { @MainActor in action(position) }
       return .success
     }
   }

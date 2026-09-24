@@ -1,4 +1,6 @@
+import AppKit
 import Foundation
+import MediaPlayer
 import Testing
 @testable import Wavelength
 
@@ -179,5 +181,23 @@ struct DiscoverParsingTests {
 
   @Test func dropsItemsWithoutIDs() {
     #expect(DiscoverAPI.posts(from: ["items": [["url": "https://a"]]]).isEmpty)
+  }
+}
+
+struct NowPlayingTests {
+  @Test func artworkCanBeRenderedOffTheMainThread() async throws {
+    let image = NSImage(size: CGSize(width: 8, height: 8))
+    image.lockFocus()
+    NSColor.orange.setFill()
+    NSRect(x: 0, y: 0, width: 8, height: 8).fill()
+    image.unlockFocus()
+    let data = try #require(image.tiffRepresentation)
+    nonisolated(unsafe) let artwork = NowPlaying.artwork(from: data, size: image.size)
+
+    let rendered = await Task.detached {
+      artwork.image(at: CGSize(width: 4, height: 4))?.size
+    }.value
+
+    #expect(rendered != nil)
   }
 }
