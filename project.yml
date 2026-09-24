@@ -1,0 +1,79 @@
+name: Wavelength
+options:
+  bundleIdPrefix: blog.micro
+  deploymentTarget:
+    macOS: "26.0"
+  createIntermediateGroups: true
+settings:
+  base:
+    SWIFT_VERSION: "6.0"
+    SWIFT_DEFAULT_ACTOR_ISOLATION: MainActor
+    SWIFT_APPROACHABLE_CONCURRENCY: YES
+    MACOSX_DEPLOYMENT_TARGET: "26.0"
+    DEVELOPMENT_TEAM: ""
+    CODE_SIGN_STYLE: Automatic
+    CODE_SIGN_IDENTITY: "-"
+    ENABLE_HARDENED_RUNTIME: YES
+    DEAD_CODE_STRIPPING: YES
+packages:
+  LAME:
+    path: Packages/LAME
+targets:
+  Wavelength:
+    type: application
+    platform: macOS
+    sources:
+      - Wavelength
+    dependencies:
+      - package: LAME
+    entitlements:
+      path: Wavelength/Resources/Wavelength.entitlements
+      properties:
+        com.apple.security.app-sandbox: true
+        com.apple.security.network.client: true
+        com.apple.security.device.audio-input: true
+        com.apple.security.files.user-selected.read-write: true
+    info:
+      path: Wavelength/Resources/Info.plist
+      properties:
+        CFBundleDisplayName: Wavelength
+        CFBundleShortVersionString: "$(MARKETING_VERSION)"
+        CFBundleVersion: "$(CURRENT_PROJECT_VERSION)"
+        LSApplicationCategoryType: public.app-category.productivity
+        NSMicrophoneUsageDescription: Allow Wavelength to record podcasts.
+        CFBundleURLTypes:
+          - CFBundleURLName: blog.micro.wavelength
+            CFBundleURLSchemes:
+              - wavelength
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: blog.micro.wavelength
+        PRODUCT_NAME: Wavelength
+        MARKETING_VERSION: "2.0"
+        CURRENT_PROJECT_VERSION: "1"
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
+        ENABLE_USER_SELECTED_FILES: readwrite
+        GENERATE_INFOPLIST_FILE: NO
+  WavelengthTests:
+    type: bundle.unit-test
+    platform: macOS
+    sources:
+      - WavelengthTests
+    dependencies:
+      - target: Wavelength
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: blog.micro.wavelength.tests
+        BUNDLE_LOADER: "$(TEST_HOST)"
+        TEST_HOST: "$(BUILT_PRODUCTS_DIR)/Wavelength.app/Contents/MacOS/Wavelength"
+        GENERATE_INFOPLIST_FILE: YES
+schemes:
+  Wavelength:
+    build:
+      targets:
+        Wavelength: all
+        WavelengthTests: [test]
+    test:
+      targets:
+        - WavelengthTests
