@@ -24,6 +24,8 @@ struct EpisodeEditorView: View {
             uploadLimitBanner(episode)
           }
 
+          header(episode)
+
           SegmentEditorView(editor: document, player: player, focusTitle: episode.title)
         }
         .navigationSubtitle(subtitle(episode))
@@ -56,6 +58,22 @@ struct EpisodeEditorView: View {
     .onDisappear {
       player.reset()
     }
+  }
+
+  private func header(_ episode: Episode) -> some View {
+    VStack(alignment: .leading, spacing: 2) {
+      Text(episode.title)
+        .font(.title2.weight(.semibold))
+        .lineLimit(1)
+        .truncationMode(.middle)
+
+      Text(subtitle(episode))
+        .font(.callout.monospacedDigit())
+        .foregroundStyle(.secondary)
+    }
+    .frame(maxWidth: .infinity, alignment: .leading)
+    .padding(.horizontal, 20)
+    .padding(.top, 16)
   }
 
   private func uploadLimitBanner(_ episode: Episode) -> some View {
