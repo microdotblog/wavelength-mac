@@ -5,15 +5,11 @@ struct PlayPauseIcon: View {
   var size: CGFloat = 16
 
   var body: some View {
-    let glyph = PlayPauseGlyph(progress: isPlaying ? 1 : 0)
-
-    ZStack {
-      glyph.fill()
-      glyph.stroke(style: StrokeStyle(lineWidth: size * 0.08, lineJoin: .round))
-    }
-    .frame(width: size, height: size)
-    .animation(.spring(duration: 0.22, bounce: 0.15), value: isPlaying)
-    .accessibilityLabel(isPlaying ? "Pause" : "Play")
+    PlayPauseGlyph(progress: isPlaying ? 1 : 0)
+      .fill()
+      .frame(width: size, height: size)
+      .animation(.spring(duration: 0.22, bounce: 0.15), value: isPlaying)
+      .accessibilityLabel(isPlaying ? "Pause" : "Play")
   }
 }
 
@@ -64,6 +60,6 @@ nonisolated private struct PlayPauseGlyph: Shape {
       path.closeSubpath()
     }
 
-    return path
+    return path.union(path.strokedPath(StrokeStyle(lineWidth: rect.width * 0.08, lineJoin: .round)))
   }
 }
