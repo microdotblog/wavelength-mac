@@ -29,7 +29,7 @@ struct WavelengthCommands: Commands {
     }
 
     CommandMenu("Episode") {
-      Button("Play/Pause") { segment?.togglePlayback() }
+      Button("Play/Pause") { (episode?.togglePlayback ?? segment?.togglePlayback)?() }
         .disabled(segment == nil)
 
       Button("Split at Playhead") { segment?.split?() }

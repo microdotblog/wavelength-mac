@@ -6,6 +6,8 @@ struct EpisodeEditorView: View {
   @Environment(AppModel.self) private var model
   @Environment(Library.self) private var library
   @Environment(Toasts.self) private var toasts
+  @Environment(NowPlaying.self) private var nowPlaying
+  @Environment(Recorder.self) private var recorder
   @Environment(\.openURL) private var openURL
   @State private var document: EpisodeDocument?
   @State private var player = SegmentPlayer()
@@ -27,9 +29,15 @@ struct EpisodeEditorView: View {
         .navigationSubtitle(subtitle(episode))
         .toolbar { toolbar(episode) }
         .focusedSceneValue(\.episodeActions, actions(for: episode))
-        .onKeyPress(.space) {
-          player.toggle()
+        .onKeyPress(.space, phases: .down) { _ in
+          guard !recorder.isActive else { return .ignored }
+          togglePlayback()
           return .handled
+        }
+        .onChange(of: player.isPlaying) { _, isPlaying in
+          if isPlaying && nowPlaying.post != nil {
+            nowPlaying.stop()
+          }
         }
         .episodeDeleteDialog(episode: episode, isPresented: $isConfirmingDelete)
         .alert("Rename Episode", isPresented: $isRenaming) {
@@ -109,8 +117,17 @@ struct EpisodeEditorView: View {
     return parts.joined(separator: " · ")
   }
 
+  private func togglePlayback() {
+    if nowPlaying.isPlaying {
+      nowPlaying.stop()
+    } else {
+      player.toggle()
+    }
+  }
+
   private func actions(for episode: Episode) -> EpisodeActions {
     EpisodeActions(
+      togglePlayback: recorder.isActive ? nil : { togglePlayback() },
       publish: episode.isPublished ? nil : { model.sheet = .publish(episodeID: episode.id) },
       rename: startRename,
       duplicate: { model.duplicate(episode: episode.id) },
@@ -190,6 +207,7 @@ struct EpisodeMenuItems: View {
 }
 
 struct EpisodeActions {
+  let togglePlayback: (() -> Void)?
   let publish: (() -> Void)?
   let rename: () -> Void
   let duplicate: () -> Void

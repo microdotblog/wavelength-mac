@@ -4,6 +4,7 @@ struct EpisodeListView: View {
   @Environment(AppModel.self) private var model
   @Environment(Library.self) private var library
   @Environment(Toasts.self) private var toasts
+  @FocusedValue(\.episodeActions) private var episode
   @State private var pendingDelete: Episode?
   @State private var renaming: Episode?
   @State private var renameDraft = ""
@@ -37,6 +38,11 @@ struct EpisodeListView: View {
           }
         }
         .environment(\.defaultMinListRowHeight, EpisodeRow.height)
+        .onKeyPress(.space, phases: .down) { _ in
+          guard let togglePlayback = episode?.togglePlayback else { return .ignored }
+          togglePlayback()
+          return .handled
+        }
         .onDeleteCommand {
           pendingDelete = library.episode(model.selectedEpisodeID)
         }
