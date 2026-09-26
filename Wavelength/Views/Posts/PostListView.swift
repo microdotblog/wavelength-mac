@@ -49,17 +49,27 @@ struct PostListView: View {
         }
       }
     }
+    .safeAreaInset(edge: .top, spacing: 0) {
+      if source == .all && posts.filter != .all {
+        filterBar
+      }
+    }
     .navigationTitle(source == .all ? "Posts" : "Narrations")
     .navigationSubtitle(session.destinationName)
     .toolbar {
       if source == .all {
-        ToolbarItem {
-          Picker("Filter", selection: $posts.filter) {
-            ForEach(PostsStore.Filter.allCases) { filter in
-              Text(filter.label).tag(filter)
+        ToolbarItem(placement: .navigation) {
+          Menu {
+            Picker("Filter", selection: $posts.filter) {
+              ForEach(PostsStore.Filter.allCases) { filter in
+                Text(filter.label).tag(filter)
+              }
             }
+            .pickerStyle(.inline)
+            .labelsHidden()
+          } label: {
+            Label("Filter", systemImage: posts.filter == .all ? "line.3.horizontal.decrease" : "line.3.horizontal.decrease.circle.fill")
           }
-          .pickerStyle(.menu)
           .help("Filter posts")
         }
       }
@@ -89,6 +99,30 @@ struct PostListView: View {
     } message: { _ in
       Text("This deletes the post from Micro.blog.")
     }
+  }
+
+  private var filterBar: some View {
+    VStack(spacing: 0) {
+      HStack {
+        Text("Showing: \(posts.filter.label)")
+          .font(.callout)
+          .foregroundStyle(.secondary)
+
+        Spacer()
+
+        Button { posts.filter = .all } label: {
+          Image(systemName: "xmark.circle.fill")
+            .foregroundStyle(.secondary)
+        }
+        .buttonStyle(.borderless)
+        .help("Show all posts")
+      }
+      .padding(.horizontal, 14)
+      .padding(.vertical, 6)
+
+      Divider()
+    }
+    .background(.bar)
   }
 
   @ViewBuilder
