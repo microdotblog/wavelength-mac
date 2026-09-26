@@ -285,6 +285,7 @@ struct RecordingPanel<Accessory: View>: View {
       Image(systemName: symbol)
         .font(.title2.weight(.semibold))
         .frame(width: 52, height: 52)
+        .contentShape(.circle)
     }
     .buttonStyle(.plain)
     .glassEffect(.regular.interactive(), in: .circle)
