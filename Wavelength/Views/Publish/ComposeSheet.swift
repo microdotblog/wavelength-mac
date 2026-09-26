@@ -100,6 +100,10 @@ struct ComposeSheet: View {
         .background(Color.canvas, in: .rect(cornerRadius: 8))
         .overlay { RoundedRectangle(cornerRadius: 8).strokeBorder(Color.line) }
 
+        if case .publish(let episodeID) = mode, let episode = model.library.episode(episodeID) {
+          EpisodeAttachmentCard(episode: episode, isPublishing: composer.isBusy)
+        }
+
         DisclosureGroup(isExpanded: $showsOptions) {
           options(composer)
             .padding(.top, 8)
