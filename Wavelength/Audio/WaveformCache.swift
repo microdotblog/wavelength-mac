@@ -23,7 +23,7 @@ final class WaveformCache {
     guard !pending.contains(key) else { return }
 
     pending.insert(key)
-    let count = min(2_000, max(Waveform.sampleCount, Int(durationSeconds * 20)))
+    let count = min(60_000, max(Waveform.sampleCount, Int(durationSeconds * 100)))
 
     Task {
       let levels = (try? await WaveformAnalyzer.levels(of: url, count: count)) ?? []

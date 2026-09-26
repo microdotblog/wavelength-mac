@@ -9,7 +9,10 @@ struct SegmentEditorView: View {
 
   @Environment(Toasts.self) private var toasts
   @State private var selectedSegment: String?
+  @State private var selectedRange: ClosedRange<Double>?
+  @State private var viewport = TimelineViewport()
   @State private var pendingDelete: ClipMeta?
+  @State private var pendingRangeDelete: ClosedRange<Double>?
   @State private var isImporting = false
 
   private var urls: [URL] {
@@ -19,11 +22,15 @@ struct SegmentEditorView: View {
 
   var body: some View {
     VStack(spacing: 0) {
+      timelineBar
+
       SegmentTimeline(
         segments: editor.segments,
         folder: editor.segmentFolder,
         player: player,
+        viewport: viewport,
         selection: $selectedSegment,
+        range: $selectedRange,
         canReorder: !editor.isLocked && !editor.isWorking,
         move: move,
         delete: deleteSelected
@@ -32,16 +39,8 @@ struct SegmentEditorView: View {
       }
       .frame(minHeight: 160, maxHeight: .infinity)
       .padding(.horizontal, 20)
-      .padding(.top, 14)
+      .padding(.top, 8)
       .padding(.bottom, 16)
-      .overlay(alignment: .topTrailing) {
-        if editor.isWorking || player.isLoading {
-          ProgressView()
-            .controlSize(.small)
-            .padding(.trailing, 20)
-            .padding(.top, 14)
-        }
-      }
 
       if editor.isLocked {
         Label("This episode is published, so its audio is locked. Duplicate it to make changes.", systemImage: "lock")
@@ -60,6 +59,9 @@ struct SegmentEditorView: View {
     .task(id: urls) {
       await player.load(urls)
     }
+    .onChange(of: editor.segments.map(\.name)) {
+      selectedRange = nil
+    }
     .focusedSceneValue(\.segmentActions, segmentActions)
     .fileImporter(isPresented: $isImporting, allowedContentTypes: [.audio]) { result in
       if case .success(let url) = result {
@@ -74,6 +76,13 @@ struct SegmentEditorView: View {
     } message: { _ in
       Text("This removes the segment from this recording.")
     }
+    .confirmationDialog("Delete selection?", isPresented: isConfirmingRangeDelete, presenting: pendingRangeDelete) { range in
+      Button("Delete Selection", role: .destructive) {
+        carve(.delete, range: range)
+      }
+    } message: { range in
+      Text("This removes \(Formatting.preciseDuration(range.upperBound - range.lowerBound)) of audio from this recording.")
+    }
   }
 
   @ViewBuilder
@@ -87,31 +96,91 @@ struct SegmentEditorView: View {
     }
   }
 
-  @ViewBuilder
   private var transport: some View {
-    if editor.isLocked {
-      TransportBar(player: player)
-    } else {
-      HStack(spacing: 12) {
+    HStack(spacing: 12) {
+      if !editor.isLocked {
         Button("Add File", systemImage: "plus") { isImporting = true }
           .buttonStyle(.borderless)
           .labelStyle(.titleAndIcon)
           .disabled(editor.isWorking)
           .help("Add Audio File… (⇧⌘I)")
-
-        TransportBar(player: player, canSplit: canSplit, split: splitAtPlayhead)
       }
+
+      TransportBar(player: player, canSplit: canSplit, split: editor.isLocked ? nil : { split() })
     }
   }
 
+  private var timelineBar: some View {
+    HStack(spacing: 14) {
+      if let selectedRange, !editor.isLocked {
+        Text("\(Formatting.preciseDuration(selectedRange.upperBound - selectedRange.lowerBound)) selected")
+          .monospacedDigit()
+          .foregroundStyle(.secondary)
+
+        Button("Split", systemImage: "scissors") { carve(.split, range: selectedRange) }
+          .help("Split at the selection edges (⌘T)")
+          .disabled(editor.isWorking)
+
+        Button("Delete", systemImage: "trash") { pendingRangeDelete = selectedRange }
+          .help("Delete the selected audio (⌫)")
+          .disabled(editor.isWorking)
+      } else if !editor.isLocked {
+        Text("Drag across the waveform to select audio.")
+          .foregroundStyle(.tertiary)
+      }
+
+      Spacer(minLength: 0)
+
+      if editor.isWorking || player.isLoading {
+        ProgressView()
+          .controlSize(.small)
+      }
+
+      zoomSlider
+    }
+    .buttonStyle(.borderless)
+    .font(.callout)
+    .frame(minHeight: 24)
+    .padding(.horizontal, 20)
+    .padding(.top, 10)
+  }
+
+  private var zoomSlider: some View {
+    HStack(spacing: 6) {
+      Image(systemName: "minus.magnifyingglass")
+      Slider(
+        value: Binding(
+          get: { log(viewport.zoom) },
+          set: { viewport.setZoom(exp($0), anchor: viewport.screenX(at: player.currentTime)) }
+        ),
+        in: 0...max(log(viewport.maxZoom), 0.01)
+      )
+      .controlSize(.mini)
+      .frame(width: 90)
+      Image(systemName: "plus.magnifyingglass")
+    }
+    .foregroundStyle(.secondary)
+    .disabled(viewport.maxZoom <= 1)
+    .help("Zoom (⌘+ / ⌘−)")
+  }
+
   private var segmentActions: SegmentActions {
-    let importAction: (() -> Void)? = editor.isLocked ? nil : { isImporting = true }
-    let splitAction: (() -> Void)? = canSplit ? { splitAtPlayhead() } : nil
-    return SegmentActions(togglePlayback: { player.toggle() }, split: splitAction, importAudio: importAction)
+    SegmentActions(
+      togglePlayback: { player.toggle() },
+      split: canSplit ? { split() } : nil,
+      importAudio: editor.isLocked ? nil : { isImporting = true },
+      zoomIn: viewport.zoom < viewport.maxZoom ? { viewport.zoom(by: 1.5, around: player.currentTime) } : nil,
+      zoomOut: viewport.zoom > 1 ? { viewport.zoom(by: 1 / 1.5, around: player.currentTime) } : nil,
+      zoomToFit: viewport.zoom > 1 ? { viewport.setZoom(1) } : nil
+    )
   }
 
   private var isConfirmingDelete: Binding<Bool> {
     Binding(get: { pendingDelete != nil }, set: { if !$0 { pendingDelete = nil } })
+  }
+
+  private var isConfirmingRangeDelete: Binding<Bool> {
+    Binding(get: { pendingRangeDelete != nil }, set: { if !$0 { pendingRangeDelete = nil } })
   }
 
   private func appendRecording(_ take: RecordedTake) async throws {
@@ -127,7 +196,11 @@ struct SegmentEditorView: View {
   }
 
   private func deleteSelected() {
-    if let clip = editor.segments.first(where: { $0.name == selectedSegment }) {
+    guard !editor.isLocked, !editor.isWorking else { return }
+
+    if let selectedRange {
+      pendingRangeDelete = selectedRange
+    } else if let clip = editor.segments.first(where: { $0.name == selectedSegment }) {
       requestDelete(clip)
     }
   }
@@ -145,11 +218,18 @@ struct SegmentEditorView: View {
     if !editor.isLocked {
       Divider()
 
-      if canSplit, currentSegment?.name == clip.name {
-        Button("Split at Playhead", action: splitAtPlayhead)
-      }
+      Group {
+        if let selectedRange {
+          Button("Split at Selection") { carve(.split, range: selectedRange) }
+          Button("Delete Selection…", role: .destructive) { pendingRangeDelete = selectedRange }
+          Divider()
+        } else if canSplit, currentSegment?.name == clip.name {
+          Button("Split at Playhead", action: splitAtPlayhead)
+        }
 
-      Button("Delete Segment…", role: .destructive) { requestDelete(clip) }
+        Button("Delete Segment…", role: .destructive) { requestDelete(clip) }
+      }
+      .disabled(editor.isWorking)
     }
   }
 
@@ -159,6 +239,11 @@ struct SegmentEditorView: View {
   }
 
   private var canSplit: Bool {
+    guard !editor.isLocked, !editor.isWorking else { return false }
+    return selectedRange != nil || canSplitAtPlayhead
+  }
+
+  private var canSplitAtPlayhead: Bool {
     guard !editor.isLocked, !editor.isWorking, let index = player.currentSegmentIndex,
           editor.segments.indices.contains(index) else {
       return false
@@ -167,6 +252,46 @@ struct SegmentEditorView: View {
     let local = player.currentTime - player.segmentStart(index)
     let end = index + 1 < player.boundaries.count ? player.boundaries[index + 1] : player.duration
     return local > 0.1 && player.currentTime < end - 0.1
+  }
+
+  private func split() {
+    if let selectedRange {
+      carve(.split, range: selectedRange)
+    } else {
+      splitAtPlayhead()
+    }
+  }
+
+  private var spans: [SegmentCarving.Span] {
+    let segments = editor.segments
+    let useBoundaries = player.boundaries.count == segments.count && player.duration > 0
+    var start = 0.0
+
+    return segments.indices.map { index in
+      let duration: Double
+      if useBoundaries {
+        let end = index + 1 < player.boundaries.count ? player.boundaries[index + 1] : player.duration
+        start = player.boundaries[index]
+        duration = max(end - start, 0)
+      } else {
+        duration = segments[index].durationSeconds
+      }
+
+      defer { start += duration }
+      return SegmentCarving.Span(name: segments[index].name, start: start, duration: duration)
+    }
+  }
+
+  private func carve(_ edit: SegmentCarving.Edit, range: ClosedRange<Double>) {
+    guard !editor.isLocked, !editor.isWorking else { return }
+    let plan = SegmentCarving.plan(edit, range: range, spans: spans)
+    guard !plan.isEmpty else { return }
+
+    player.pause()
+    run {
+      try await editor.carve(keeping: plan)
+      selectedRange = nil
+    }
   }
 
   private func splitAtPlayhead() {
@@ -248,13 +373,15 @@ struct TransportBar: View {
       Text("\(Formatting.preciseDuration(player.currentTime)) / \(Formatting.duration(player.duration))")
         .font(.callout.monospacedDigit())
         .foregroundStyle(.secondary)
+        .lineLimit(1)
+        .fixedSize()
 
       if let split {
         Button(action: split) {
           Image(systemName: "scissors")
         }
         .disabled(!canSplit)
-        .help("Split at Playhead (⌘T)")
+        .help("Split at Playhead or Selection (⌘T)")
       }
     }
     .buttonStyle(.borderless)
@@ -266,6 +393,9 @@ struct SegmentActions {
   let togglePlayback: () -> Void
   let split: (() -> Void)?
   let importAudio: (() -> Void)?
+  let zoomIn: (() -> Void)?
+  let zoomOut: (() -> Void)?
+  let zoomToFit: (() -> Void)?
 }
 
 extension FocusedValues {

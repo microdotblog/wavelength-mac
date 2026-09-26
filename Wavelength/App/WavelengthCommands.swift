@@ -32,7 +32,7 @@ struct WavelengthCommands: Commands {
       Button("Play/Pause") { (episode?.togglePlayback ?? segment?.togglePlayback)?() }
         .disabled(segment == nil)
 
-      Button("Split at Playhead") { segment?.split?() }
+      Button("Split") { segment?.split?() }
         .keyboardShortcut("t")
         .disabled(segment?.split == nil)
 
@@ -66,6 +66,22 @@ struct WavelengthCommands: Commands {
 
       Button("Delete Episode…") { episode?.delete() }
         .disabled(episode == nil)
+    }
+
+    CommandGroup(before: .toolbar) {
+      Button("Zoom In") { segment?.zoomIn?() }
+        .keyboardShortcut("+")
+        .disabled(segment?.zoomIn == nil)
+
+      Button("Zoom Out") { segment?.zoomOut?() }
+        .keyboardShortcut("-")
+        .disabled(segment?.zoomOut == nil)
+
+      Button("Zoom to Fit") { segment?.zoomToFit?() }
+        .keyboardShortcut("0")
+        .disabled(segment?.zoomToFit == nil)
+
+      Divider()
     }
 
     CommandGroup(before: .sidebar) {
