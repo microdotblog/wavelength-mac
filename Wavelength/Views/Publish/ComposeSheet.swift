@@ -100,9 +100,18 @@ struct ComposeSheet: View {
         .background(Color.paper, in: .rect(cornerRadius: 8))
         .overlay { RoundedRectangle(cornerRadius: 8).strokeBorder(Color.line) }
 
-        DisclosureGroup("Options", isExpanded: $showsOptions) {
+        DisclosureGroup(isExpanded: $showsOptions) {
           options(composer)
             .padding(.top, 8)
+        } label: {
+          Button {
+            withAnimation { showsOptions.toggle() }
+          } label: {
+            Text("Options")
+              .frame(maxWidth: .infinity, alignment: .leading)
+              .contentShape(.rect)
+          }
+          .buttonStyle(.plain)
         }
 
         if let message = composer.errorMessage {
