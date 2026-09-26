@@ -131,6 +131,29 @@ final class EditingFlowTests {
     #expect(abs(try await AudioEditing.duration(of: mergedAfter) - 4) < 0.2)
   }
 
+  @Test func deletingARangeAcrossSegmentsKeepsTheRest() async throws {
+    let session = Session()
+    let library = Library(storage: EpisodeStorage(root: root.appending(path: "episodes")), session: session, posts: PostsStore(session: session))
+    let episode = try library.create(from: try await take(seconds: 3))
+    try library.append(try await take(seconds: 2), to: episode.id)
+
+    let clips = try #require(library.episode(episode.id)?.clips)
+    let spans = [
+      SegmentCarving.Span(name: clips[0].name, start: 0, duration: clips[0].durationSeconds),
+      SegmentCarving.Span(name: clips[1].name, start: clips[0].durationSeconds, duration: clips[1].durationSeconds),
+    ]
+    try await library.carve(episode.id, keeping: SegmentCarving.plan(.delete, range: 2...4, spans: spans))
+
+    let carved = try #require(library.episode(episode.id)?.clips)
+    #expect(carved.count == 2)
+    #expect(abs(carved[0].durationSeconds - 2) < 0.1)
+    #expect(abs(carved[1].durationSeconds - 1) < 0.1)
+    #expect(!FileManager.default.fileExists(atPath: episode.folder.appending(path: clips[0].name).path))
+
+    let merged = try await library.mergedAudio(episode.id)
+    #expect(abs(try await AudioEditing.duration(of: merged) - 3) < 0.2)
+  }
+
   @Test func narrationDraftOpensEditsAndCommitsATake() async throws {
     let draft = NarrationDraft(storage: NarrationStorage(root: root.appending(path: "narrations")))
     let source = try await take(seconds: 2)

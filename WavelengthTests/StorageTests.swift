@@ -48,6 +48,47 @@ struct SegmentInfoTests {
   }
 }
 
+struct SegmentCarvingTests {
+  private let spans = [
+    SegmentCarving.Span(name: "a", start: 0, duration: 4),
+    SegmentCarving.Span(name: "b", start: 4, duration: 6),
+  ]
+
+  @Test func deletingInsideOneSegmentKeepsBothSides() {
+    let plan = SegmentCarving.plan(.delete, range: 1...2, spans: spans)
+
+    #expect(plan == ["a": [0..<1, 2..<4]])
+  }
+
+  @Test func deletingAcrossSegmentsTrimsEachSide() {
+    let plan = SegmentCarving.plan(.delete, range: 3...5, spans: spans)
+
+    #expect(plan == ["a": [0..<3], "b": [1..<6]])
+  }
+
+  @Test func deletingAWholeSegmentRemovesIt() {
+    let plan = SegmentCarving.plan(.delete, range: 3.99...10, spans: spans)
+
+    #expect(plan == ["b": []])
+  }
+
+  @Test func splittingARangeCutsAtBothEdges() {
+    let plan = SegmentCarving.plan(.split, range: 1...2, spans: spans)
+
+    #expect(plan == ["a": [0..<1, 1..<2, 2..<4]])
+  }
+
+  @Test func splittingAtASegmentEdgeLeavesThatSegmentAlone() {
+    let plan = SegmentCarving.plan(.split, range: 4...5, spans: spans)
+
+    #expect(plan == ["b": [0..<1, 1..<6]])
+  }
+
+  @Test func tinyRangesChangeNothing() {
+    #expect(SegmentCarving.plan(.delete, range: 1...1.01, spans: spans).isEmpty)
+  }
+}
+
 @MainActor
 final class EpisodeStorageTests {
   let root = FileManager.default.temporaryDirectory.appending(path: "wavelength-tests-\(UUID().uuidString)")

@@ -170,12 +170,37 @@ final class NarrationDraft: SegmentEditing {
     isLoading = false
   }
 
-  private func replace(_ clips: [ClipMeta]) throws {
+  func carve(keeping plan: [String: [Range<Double>]]) async throws {
+    guard !plan.isEmpty else { return }
+
+    let folder = try requireFolder()
+    let draftUID = postUID
+    isWorking = true
+    defer { isWorking = false }
+
+    let original = segments.map(\.name)
+    let carved = try await folder.carve(segments, keeping: plan)
+    let added = carved.map(\.name).filter { !original.contains($0) }
+
+    guard postUID == draftUID, segments.map(\.name) == original else {
+      folder.discard(added)
+      throw StorageError(message: "The segments changed while they were being edited.")
+    }
+
+    do {
+      try replace(carved, in: folder)
+    } catch {
+      folder.discard(added)
+      throw error
+    }
+  }
+
+  private func replace(_ clips: [ClipMeta], in folder: SegmentFolder? = nil) throws {
     guard !clips.isEmpty else {
       throw StorageError(message: "Narration needs at least one segment.")
     }
 
-    info = try requireFolder().replaceClips(clips)
+    info = try (folder ?? requireFolder()).replaceClips(clips)
     isDirty = true
   }
 

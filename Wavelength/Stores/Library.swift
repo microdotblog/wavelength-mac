@@ -18,6 +18,7 @@ protocol SegmentEditing: AnyObject {
   func reorder(_ clips: [ClipMeta]) async throws
   func deleteSegment(_ clip: ClipMeta) async throws
   func split(_ clip: ClipMeta, at seconds: Double) async throws
+  func carve(keeping plan: [String: [Range<Double>]]) async throws
 }
 
 @Observable
@@ -123,6 +124,29 @@ final class Library {
       }
 
       apply(try storage.replaceClips(of: id, with: current.flatMap { $0.name == clip.name ? replacement : [$0] }))
+    }
+  }
+
+  func carve(_ id: String, keeping plan: [String: [Range<Double>]]) async throws {
+    guard let episode = episode(id), !episode.isPublished, !plan.isEmpty else { return }
+
+    try await working(id) {
+      let folder = storage.folder(id)
+      let original = episode.clips.map(\.name)
+      let carved = try await folder.carve(episode.clips, keeping: plan)
+      let added = carved.map(\.name).filter { !original.contains($0) }
+
+      guard self.episode(id)?.clips.map(\.name) == original else {
+        folder.discard(added)
+        throw StorageError(message: "The segments changed while they were being edited.")
+      }
+
+      guard !carved.isEmpty else {
+        folder.discard(added)
+        throw StorageError(message: "A recording needs at least one segment.")
+      }
+
+      apply(try storage.replaceClips(of: id, with: carved))
     }
   }
 
@@ -238,5 +262,9 @@ final class EpisodeDocument: SegmentEditing {
 
   func split(_ clip: ClipMeta, at seconds: Double) async throws {
     try await library.split(id, clip: clip, at: seconds)
+  }
+
+  func carve(keeping plan: [String: [Range<Double>]]) async throws {
+    try await library.carve(id, keeping: plan)
   }
 }

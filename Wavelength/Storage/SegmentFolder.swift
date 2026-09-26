@@ -72,6 +72,38 @@ nonisolated struct SegmentFolder: Sendable {
     return info
   }
 
+  func carve(_ clips: [ClipMeta], keeping plan: [String: [Range<Double>]]) async throws -> [ClipMeta] {
+    var placed: [String] = []
+
+    do {
+      var carved: [ClipMeta] = []
+
+      for clip in clips {
+        guard let ranges = plan[clip.name] else {
+          carved.append(clip)
+          continue
+        }
+
+        let pieces = try await AudioEditing.pieces(of: url.appending(path: clip.name), keeping: ranges, waveform: clip.waveform)
+
+        for piece in pieces {
+          let name = try place(piece.url)
+          placed.append(name)
+          carved.append(ClipMeta(name: name, durationSeconds: piece.durationSeconds, waveform: piece.waveform))
+        }
+      }
+
+      return carved
+    } catch {
+      discard(placed)
+      throw error
+    }
+  }
+
+  func discard(_ clipNames: [String]) {
+    clipNames.forEach { try? FileManager.default.removeItem(at: url.appending(path: $0)) }
+  }
+
   func place(_ source: URL) throws -> String {
     let name = "segment-\(nextSegmentIndex()).\(Self.segmentExtension)"
     try FileManager.default.moveItem(at: source, to: url.appending(path: name))

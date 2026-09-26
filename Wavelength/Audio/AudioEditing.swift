@@ -58,26 +58,40 @@ nonisolated enum AudioEditing {
       throw AudioError(message: "Move the playhead inside the segment to split it.")
     }
 
+    let pieces = try await pieces(of: source, keeping: [0..<seconds, seconds..<total], waveform: waveform)
+    return (pieces[0], pieces[1])
+  }
+
+  @concurrent static func pieces(of source: URL, keeping ranges: [Range<Double>], waveform: [Float]) async throws -> [ProcessedAudio] {
     let asset = AVURLAsset(url: source)
-    let splitTime = CMTime(seconds: seconds, preferredTimescale: 44_100)
-    let first = AppDirectories.scratchFile("split")
-    let second = AppDirectories.scratchFile("split")
+    let total = try await duration(of: source)
+    var made: [URL] = []
 
     do {
-      try await extract(asset, range: CMTimeRange(start: .zero, end: splitTime), to: first)
-      try await extract(asset, range: CMTimeRange(start: splitTime, end: asset.load(.duration)), to: second)
+      var pieces: [ProcessedAudio] = []
 
-      let firstDuration = try await duration(of: first)
-      let secondDuration = try await duration(of: second)
-      let fraction = seconds / total
+      for range in ranges {
+        let start = min(max(range.lowerBound, 0), total)
+        let end = min(max(range.upperBound, start), total)
+        let output = AppDirectories.scratchFile("split")
+        made.append(output)
 
-      return (
-        ProcessedAudio(url: first, durationSeconds: firstDuration, waveform: Waveform.slice(waveform, from: 0, to: fraction)),
-        ProcessedAudio(url: second, durationSeconds: secondDuration, waveform: Waveform.slice(waveform, from: fraction, to: 1))
-      )
+        try await extract(
+          asset,
+          range: CMTimeRange(start: CMTime(seconds: start, preferredTimescale: 44_100), end: CMTime(seconds: end, preferredTimescale: 44_100)),
+          to: output
+        )
+
+        pieces.append(ProcessedAudio(
+          url: output,
+          durationSeconds: try await duration(of: output),
+          waveform: Waveform.slice(waveform, from: start / total, to: end / total)
+        ))
+      }
+
+      return pieces
     } catch {
-      try? FileManager.default.removeItem(at: first)
-      try? FileManager.default.removeItem(at: second)
+      made.forEach { try? FileManager.default.removeItem(at: $0) }
       throw error
     }
   }
