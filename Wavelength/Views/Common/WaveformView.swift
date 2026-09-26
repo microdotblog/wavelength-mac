@@ -8,6 +8,7 @@ struct WaveformView: View {
   var played: Color = .accentColor
   var unplayed: Color = Color(nsColor: .tertiaryLabelColor)
   var minimumBar: CGFloat = 1.5
+  var gain: Float = 1
 
   var body: some View {
     Canvas { context, size in
@@ -19,7 +20,7 @@ struct WaveformView: View {
 
       for (index, level) in bars.enumerated() {
         let x = CGFloat(index) * stride
-        let height = max(minimumBar, CGFloat(level) * size.height)
+        let height = max(minimumBar, CGFloat(min(level * gain, 1)) * size.height)
         let rect = CGRect(x: x, y: middle - height / 2, width: barWidth, height: height)
         let color = x + barWidth / 2 <= playedWidth ? played : unplayed
         context.fill(Path(roundedRect: rect, cornerRadius: barWidth / 2), with: .color(color))

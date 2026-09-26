@@ -1,13 +1,20 @@
 import SwiftUI
 
-struct SegmentTimeline: View {
+private let timelineSpace = "SegmentTimeline"
+
+struct SegmentTimeline<Menu: View>: View {
   let segments: [ClipMeta]
   let folder: URL?
   let player: SegmentPlayer
-  var selectedSegment: String?
-  var height: CGFloat = 150
+  @Binding var selection: String?
+  let canReorder: Bool
+  let move: (Int, Int) -> Void
+  let delete: () -> Void
+  @ViewBuilder var menu: (ClipMeta, Int) -> Menu
 
   @State private var hoverLocation: CGFloat?
+  @State private var drag: SegmentDrag?
+  @FocusState private var isFocused: Bool
   private let gap: CGFloat = 2
   private let rulerHeight: CGFloat = 20
 
@@ -15,23 +22,76 @@ struct SegmentTimeline: View {
     GeometryReader { geometry in
       let layout = TimelineLayout(segments: segments, player: player, width: geometry.size.width, gap: gap)
       let regionHeight = geometry.size.height - rulerHeight
+      let levels = segments.map(levels(of:))
+      let gain = Self.gain(for: levels)
 
       ZStack(alignment: .topLeading) {
         TimeRuler(layout: layout, duration: layout.times.last.map { $0 + (layout.durations.last ?? 0) } ?? 0)
           .frame(height: rulerHeight)
+          .contentShape(.rect)
+          .gesture(
+            DragGesture(minimumDistance: 0)
+              .onChanged { value in
+                player.seek(to: layout.time(at: value.location.x))
+              }
+          )
+          .accessibilityElement()
+          .accessibilityLabel("Playhead")
+          .accessibilityValue("\(Formatting.duration(player.currentTime)) of \(Formatting.duration(player.duration))")
+          .accessibilityAdjustableAction { direction in
+            switch direction {
+            case .increment: player.skip(by: 5)
+            case .decrement: player.skip(by: -5)
+            @unknown default: break
+            }
+          }
 
         ForEach(Array(segments.enumerated()), id: \.element.id) { index, clip in
           let frame = layout.frame(of: index)
-          region(clip, index: index, layout: layout)
+          let isMoving = drag?.index == index && drag?.isMoving == true
+
+          region(clip, index: index, levels: levels[index], gain: gain, layout: layout)
             .frame(width: max(frame.width, 1), height: regionHeight)
-            .offset(x: frame.minX, y: rulerHeight)
+            .contentShape(.rect(cornerRadius: 6))
+            .contextMenu { menu(clip, index) }
+            .accessibilityElement()
+            .accessibilityLabel("Segment \(index + 1)")
+            .accessibilityValue(Formatting.duration(layout.durations[index]))
+            .accessibilityAddTraits(clip.name == selection ? .isSelected : [])
+            .accessibilityAction {
+              selection = clip.name
+              player.seek(to: layout.times[index])
+            }
+            .accessibilityActions {
+              if canReorder && index > 0 {
+                Button("Move Earlier") { move(index, index - 1) }
+              }
+
+              if canReorder && index < segments.count - 1 {
+                Button("Move Later") { move(index, index + 1) }
+              }
+            }
+            .gesture(press(clip, index: index, layout: layout))
+            .simultaneousGesture(TapGesture(count: 2).onEnded { player.play() })
+            .shadow(color: .black.opacity(isMoving ? 0.25 : 0), radius: 8, y: 2)
+            .zIndex(isMoving ? 1 : 0)
+            .offset(x: frame.minX + (isMoving ? drag?.offset ?? 0 : 0), y: rulerHeight)
         }
 
-        if let hoverLocation {
+        if let drag, drag.isMoving, drag.target != drag.index {
+          Capsule()
+            .fill(Color.accentColor)
+            .frame(width: 3, height: regionHeight)
+            .offset(x: insertionX(for: drag, layout: layout) - 1.5, y: rulerHeight)
+            .allowsHitTesting(false)
+        }
+
+        if let hoverLocation, drag?.isMoving != true {
           Rectangle()
             .fill(Color.secondary.opacity(0.5))
             .frame(width: 1, height: regionHeight)
             .offset(x: hoverLocation, y: rulerHeight)
+            .allowsHitTesting(false)
 
           Text(Formatting.preciseDuration(layout.time(at: hoverLocation)))
             .font(.caption2.monospacedDigit())
@@ -40,19 +100,17 @@ struct SegmentTimeline: View {
             .background(.background, in: .rect(cornerRadius: 4))
             .overlay { RoundedRectangle(cornerRadius: 4).strokeBorder(.separator) }
             .offset(x: min(max(hoverLocation + 4, 0), geometry.size.width - 52), y: rulerHeight + 4)
+            .allowsHitTesting(false)
         }
 
         Playhead(height: geometry.size.height)
           .offset(x: layout.x(at: player.currentTime) - 6)
           .allowsHitTesting(false)
       }
-      .contentShape(.rect)
-      .gesture(
-        DragGesture(minimumDistance: 0)
-          .onChanged { value in
-            player.seek(to: layout.time(at: value.location.x))
-          }
-      )
+      .coordinateSpace(.named(timelineSpace))
+      .onChange(of: segments.map(\.id)) {
+        drag = nil
+      }
       .onContinuousHover { phase in
         switch phase {
         case .active(let location): hoverLocation = min(max(location.x, 0), geometry.size.width)
@@ -60,48 +118,128 @@ struct SegmentTimeline: View {
         }
       }
     }
-    .frame(height: height)
-    .accessibilityElement()
+    .focusable(interactions: .edit)
+    .focused($isFocused)
+    .focusEffectDisabled()
+    .onDeleteCommand(perform: delete)
+    .accessibilityElement(children: .contain)
     .accessibilityLabel("Timeline")
-    .accessibilityValue("\(Formatting.duration(player.currentTime)) of \(Formatting.duration(player.duration))")
-    .accessibilityAdjustableAction { direction in
-      switch direction {
-      case .increment: player.skip(by: 5)
-      case .decrement: player.skip(by: -5)
-      @unknown default: break
-      }
-    }
   }
 
-  private func region(_ clip: ClipMeta, index: Int, layout: TimelineLayout) -> some View {
-    let isSelected = clip.name == selectedSegment
-    let levels = folder.map { WaveformCache.shared.levels(for: $0.appending(path: clip.name), clip: clip) } ?? clip.waveform
+  private func press(_ clip: ClipMeta, index: Int, layout: TimelineLayout) -> some Gesture {
+    DragGesture(minimumDistance: 0, coordinateSpace: .named(timelineSpace))
+      .onChanged { value in
+        if drag?.index != index {
+          drag = SegmentDrag(index: index)
+          selection = clip.name
+          isFocused = true
+          player.seek(to: layout.time(at: value.startLocation.x))
+        }
+
+        guard canReorder, segments.count > 1 else {
+          player.seek(to: layout.time(at: value.location.x))
+          return
+        }
+
+        if abs(value.translation.width) > 4 {
+          drag?.isMoving = true
+        }
+
+        guard drag?.isMoving == true else { return }
+        drag?.offset = value.translation.width
+        drag?.target = target(for: index, center: layout.frame(of: index).midX + value.translation.width, layout: layout)
+      }
+      .onEnded { _ in
+        if let drag, drag.isMoving, drag.target != drag.index {
+          move(drag.index, drag.target)
+        }
+
+        drag = nil
+      }
+  }
+
+  private func target(for index: Int, center: CGFloat, layout: TimelineLayout) -> Int {
+    segments.indices.filter { $0 != index && layout.frame(of: $0).midX < center }.count
+  }
+
+  private func insertionX(for drag: SegmentDrag, layout: TimelineLayout) -> CGFloat {
+    let others = segments.indices.filter { $0 != drag.index }
+
+    if others.indices.contains(drag.target) {
+      return max(layout.frame(of: others[drag.target]).minX - gap / 2, 1.5)
+    }
+
+    return min(others.last.map { layout.frame(of: $0).maxX + gap / 2 } ?? 0, layout.width - 1.5)
+  }
+
+  private func levels(of clip: ClipMeta) -> [Float] {
+    folder.map { WaveformCache.shared.levels(for: $0.appending(path: clip.name), clip: clip) } ?? clip.waveform
+  }
+
+  private static func gain(for levels: [[Float]]) -> Float {
+    let peak = levels.joined().max() ?? 0
+    return peak > 0 ? min(0.9 / peak, 6) : 1
+  }
+
+  private func region(_ clip: ClipMeta, index: Int, levels: [Float], gain: Float, layout: TimelineLayout) -> some View {
+    let isSelected = clip.name == selection
 
     return RoundedRectangle(cornerRadius: 6)
-      .fill(Color.accentColor.opacity(isSelected ? 0.14 : 0.07))
+      .fill(isSelected ? Color.accentColor.opacity(0.14) : Color.primary.opacity(0.04))
       .overlay {
         WaveformView(
           levels: levels,
           progress: layout.localProgress(of: index, at: player.currentTime),
           barWidth: 2,
-          spacing: 1
+          spacing: 1,
+          gain: gain
         )
-        .padding(.top, 18)
-        .padding(.bottom, 8)
+        .padding(.top, 26)
+        .padding(.bottom, 14)
         .padding(.horizontal, 4)
       }
-      .overlay(alignment: .topLeading) {
-        Text("Segment \(index + 1)")
-          .font(.caption2.weight(.medium))
-          .foregroundStyle(.secondary)
-          .lineLimit(1)
-          .padding(.horizontal, 6)
-          .padding(.vertical, 3)
+      .overlay(alignment: .top) {
+        ViewThatFits(in: .horizontal) {
+          regionLabel("Segment \(index + 1)", duration: layout.durations[index])
+          regionLabel("\(index + 1)", duration: layout.durations[index])
+          regionLabel("\(index + 1)", duration: nil)
+        }
+        .padding(.horizontal, 6)
+        .padding(.vertical, 4)
       }
+      .clipShape(.rect(cornerRadius: 6))
       .overlay {
         RoundedRectangle(cornerRadius: 6)
-          .strokeBorder(isSelected ? Color.accentColor.opacity(0.8) : Color(nsColor: .separatorColor), lineWidth: 1)
+          .strokeBorder(isSelected ? Color.accentColor.opacity(0.8) : Color(nsColor: .separatorColor), lineWidth: isSelected ? 1.5 : 1)
       }
+  }
+
+  private func regionLabel(_ title: String, duration: Double?) -> some View {
+    HStack(spacing: 6) {
+      Text(title)
+        .font(.caption2.weight(.medium))
+
+      if let duration {
+        Spacer(minLength: 4)
+        Text(Formatting.duration(duration))
+          .font(.caption2.monospacedDigit())
+      }
+    }
+    .foregroundStyle(.secondary)
+    .lineLimit(1)
+    .fixedSize(horizontal: duration == nil, vertical: false)
+  }
+}
+
+private struct SegmentDrag {
+  let index: Int
+  var target: Int
+  var offset: CGFloat = 0
+  var isMoving = false
+
+  init(index: Int) {
+    self.index = index
+    target = index
   }
 }
 

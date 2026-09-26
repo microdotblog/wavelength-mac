@@ -23,8 +23,14 @@ struct SegmentEditorView: View {
         segments: editor.segments,
         folder: editor.segmentFolder,
         player: player,
-        selectedSegment: selectedSegment ?? currentSegment?.name
-      )
+        selection: $selectedSegment,
+        canReorder: !editor.isLocked && !editor.isWorking,
+        move: move,
+        delete: deleteSelected
+      ) { clip, index in
+        menu(for: clip, index: index)
+      }
+      .frame(minHeight: 160, maxHeight: .infinity)
       .padding(.horizontal, 20)
       .padding(.top, 14)
       .padding(.bottom, 16)
@@ -37,15 +43,19 @@ struct SegmentEditorView: View {
         }
       }
 
+      if editor.isLocked {
+        Label("This episode is published, so its audio is locked. Duplicate it to make changes.", systemImage: "lock")
+          .font(.callout)
+          .foregroundStyle(.secondary)
+          .padding(.horizontal, 20)
+          .padding(.bottom, 12)
+      }
+
       Divider()
 
       controlBar
         .padding(.horizontal, 16)
         .padding(.vertical, 8)
-
-      Divider()
-
-      segmentList
     }
     .task(id: urls) {
       await player.load(urls)
@@ -77,9 +87,21 @@ struct SegmentEditorView: View {
     }
   }
 
+  @ViewBuilder
   private var transport: some View {
-    let splitAction: (() -> Void)? = editor.isLocked ? nil : { splitAtPlayhead() }
-    return TransportBar(player: player, canSplit: canSplit, split: splitAction)
+    if editor.isLocked {
+      TransportBar(player: player)
+    } else {
+      HStack(spacing: 12) {
+        Button("Add File", systemImage: "plus") { isImporting = true }
+          .buttonStyle(.borderless)
+          .labelStyle(.titleAndIcon)
+          .disabled(editor.isWorking)
+          .help("Add Audio File… (⇧⌘I)")
+
+        TransportBar(player: player, canSplit: canSplit, split: splitAtPlayhead)
+      }
+    }
   }
 
   private var segmentActions: SegmentActions {
@@ -102,55 +124,6 @@ struct SegmentEditorView: View {
     let files = urls.filter(\.isFileURL)
     files.forEach(importAudio)
     return !files.isEmpty
-  }
-
-  private var segmentList: some View {
-    List(selection: $selectedSegment) {
-      Section {
-        ForEach(Array(editor.segments.enumerated()), id: \.element.id) { index, clip in
-          SegmentRow(
-            clip: clip,
-            index: index,
-            isPlaying: player.isPlaying && player.currentSegmentIndex == index
-          )
-          .tag(clip.name)
-          .contextMenu { menu(for: clip, index: index) }
-        }
-        .onMove(perform: moveAction)
-      } header: {
-        HStack {
-          Text("Segments")
-          Spacer()
-          if !editor.isLocked {
-            Button("Add Audio File…", systemImage: "plus") { isImporting = true }
-              .buttonStyle(.borderless)
-              .labelStyle(.titleAndIcon)
-              .disabled(editor.isWorking)
-          }
-        }
-      } footer: {
-        if editor.isLocked {
-          Label("This episode is published, so its audio is locked. Duplicate it to make changes.", systemImage: "lock")
-            .foregroundStyle(.secondary)
-        }
-      }
-    }
-    .listStyle(.inset(alternatesRowBackgrounds: true))
-    .onDeleteCommand(perform: deleteSelected)
-    .contextMenu(forSelectionType: String.self) { _ in
-    } primaryAction: { names in
-      if let name = names.first, let index = editor.segments.firstIndex(where: { $0.name == name }) {
-        player.play(segment: index)
-      }
-    }
-  }
-
-  private var moveAction: ((IndexSet, Int) -> Void)? {
-    if editor.isLocked {
-      return nil
-    }
-
-    return { source, destination in move(from: source, to: destination) }
   }
 
   private func deleteSelected() {
@@ -215,9 +188,10 @@ struct SegmentEditorView: View {
     }
   }
 
-  private func move(from source: IndexSet, to destination: Int) {
+  private func move(from index: Int, to target: Int) {
     var clips = editor.segments
-    clips.move(fromOffsets: source, toOffset: destination)
+    guard clips.indices.contains(index), clips.indices.contains(target) else { return }
+    clips.insert(clips.remove(at: index), at: target)
     run { try await editor.reorder(clips) }
   }
 
@@ -233,44 +207,6 @@ struct SegmentEditorView: View {
         toasts.show(error.localizedDescription)
       }
     }
-  }
-}
-
-private struct SegmentRow: View {
-  let clip: ClipMeta
-  let index: Int
-  let isPlaying: Bool
-
-  var body: some View {
-    HStack(spacing: 10) {
-      Text("\(index + 1)")
-        .monospacedDigit()
-        .foregroundStyle(.secondary)
-        .frame(width: 22, alignment: .trailing)
-
-      WaveformView(levels: clip.waveform, barWidth: 2, spacing: 1)
-        .frame(width: 120, height: 18)
-
-      Text("Segment \(index + 1)")
-
-      if isPlaying {
-        Image(systemName: "speaker.wave.2.fill")
-          .foregroundStyle(Color.accentColor)
-          .symbolEffect(.variableColor.iterative, isActive: true)
-      }
-
-      Spacer()
-
-      Text(Formatting.duration(clip.durationSeconds))
-        .monospacedDigit()
-        .foregroundStyle(.secondary)
-
-      Text(Formatting.fileSize(clip.sizeBytes))
-        .monospacedDigit()
-        .foregroundStyle(.secondary)
-        .frame(width: 64, alignment: .trailing)
-    }
-    .padding(.vertical, 2)
   }
 }
 
