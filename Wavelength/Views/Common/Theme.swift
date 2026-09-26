@@ -18,7 +18,13 @@ extension Color {
   }
 
   init(light: UInt32, dark: UInt32) {
-    self.init(nsColor: NSColor(name: nil) { appearance in
+    self.init(nsColor: NSColor(light: light, dark: dark))
+  }
+}
+
+extension NSColor {
+  convenience init(light: UInt32, dark: UInt32) {
+    self.init(name: nil) { appearance in
       let hex = appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua ? dark : light
       return NSColor(
         srgbRed: CGFloat((hex >> 16) & 0xFF) / 255,
@@ -26,6 +32,6 @@ extension Color {
         blue: CGFloat(hex & 0xFF) / 255,
         alpha: 1
       )
-    })
+    }
   }
 }

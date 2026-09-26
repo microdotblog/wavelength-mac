@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 import Testing
 @testable import Wavelength
@@ -90,6 +91,119 @@ struct WaveformTests {
     #expect(Waveform.normalize(decibels: 0) == 1)
     #expect(Waveform.normalize(decibels: -30) == 0.5)
     #expect(Waveform.normalize(decibels: -.infinity) == 0)
+  }
+}
+
+struct MarkdownHighlighterTests {
+  private func styles(_ text: String) -> [String: MarkdownHighlighter.Style] {
+    let string = text as NSString
+    return Dictionary(
+      MarkdownHighlighter.spans(in: text).map { (string.substring(with: $0.range), $0.style) },
+      uniquingKeysWith: { first, _ in first }
+    )
+  }
+
+  @Test func highlightsInlineMarkdown() {
+    let found = styles("Say **hi** to _you_ and `code` now")
+
+    #expect(found["**hi**"] == .bold)
+    #expect(found["_you_"] == .italic)
+    #expect(found["`code`"] == .code)
+  }
+
+  @Test func splitsLinksIntoTextAndURL() {
+    let found = styles("See [the show](https://example.com/a_b_c) today")
+
+    #expect(found["[the show]"] == .linkText)
+    #expect(found["(https://example.com/a_b_c)"] == .linkURL)
+  }
+
+  @Test func leavesBareURLsAlone() {
+    let spans = MarkdownHighlighter.spans(in: "Listen at https://example.com/my_great_show_ now")
+
+    #expect(spans.isEmpty)
+  }
+
+  @Test func highlightsLineLevelMarkdown() {
+    let found = styles("# Episode 3\n> A quote\n---\nHi @manton")
+
+    #expect(found["# Episode 3"] == .header)
+    #expect(found["> A quote"] == .quote)
+    #expect(found["---"] == .divider)
+    #expect(found["@manton"] == .username)
+  }
+
+  @Test func highlightsHTMLTagsAndAttributes() {
+    let found = styles(#"<img src="a.jpg" alt="x">"#)
+
+    #expect(found["<img"] == .tag)
+    #expect(found["src"] == .attributeName)
+    #expect(found[#""a.jpg""#] == .attributeValue)
+  }
+
+  @Test func ignoresUnderscoresInsideWords() {
+    #expect(styles("snake_case_name").isEmpty)
+  }
+
+  @Test func italicisesTextRightAfterATag() {
+    #expect(styles("<p>_Episode notes_</p>")["_Episode notes_"] == .italic)
+  }
+
+  @Test func highlightsAttributeValuesWithApostrophes() {
+    #expect(styles(#"<img alt="Manton's show">"#)[#""Manton's show""#] == .attributeValue)
+  }
+
+  @MainActor
+  @Test func stacksBoldAndItalic() throws {
+    let storage = NSTextStorage(string: "**_Episode 3_**")
+    MarkdownStyle.apply(to: storage)
+
+    let font = try #require(storage.attribute(.font, at: 5, effectiveRange: nil) as? NSFont)
+    let traits = font.fontDescriptor.symbolicTraits
+    #expect(traits.contains(.bold))
+    #expect(traits.contains(.italic))
+  }
+
+  @Test func skipsVeryLongText() {
+    let text = String(repeating: "**a** ", count: 1_000)
+
+    #expect(MarkdownHighlighter.spans(in: text).isEmpty)
+  }
+}
+
+struct MarkdownReturnTests {
+  @Test func startsANewParagraph() {
+    #expect(MarkdownReturn.newline(after: "First paragraph.") == "\n\n")
+  }
+
+  @Test func addsASingleLineOnAnEmptyLine() {
+    #expect(MarkdownReturn.newline(after: "") == "\n")
+    #expect(MarkdownReturn.newline(after: "First paragraph.\n\n") == "\n")
+  }
+
+  @Test func keepsCodeBlocksTight() {
+    #expect(MarkdownReturn.newline(after: "```\nlet a = 1") == "\n")
+    #expect(MarkdownReturn.newline(after: "```\ncode\n```") == "\n\n")
+  }
+}
+
+struct MarkdownPasteTests {
+  @Test func wrapsSelectedTextInALink() {
+    #expect(MarkdownPaste.link(wrapping: "the show", in: " https://example.com/ep/3\n") == "[the show](https://example.com/ep/3)")
+  }
+
+  @Test func pastesNormallyWithoutAWebURL() {
+    #expect(MarkdownPaste.link(wrapping: "the show", in: "just some words") == nil)
+    #expect(MarkdownPaste.link(wrapping: "the show", in: "ftp://example.com/file") == nil)
+    #expect(MarkdownPaste.link(wrapping: "the show", in: "https://a.com and more") == nil)
+  }
+
+  @Test func replacesALinkWithALink() {
+    #expect(MarkdownPaste.link(wrapping: "https://old.com", in: "https://new.com") == nil)
+  }
+
+  @Test func needsASelection() {
+    #expect(MarkdownPaste.link(wrapping: "", in: "https://example.com") == nil)
   }
 }
 

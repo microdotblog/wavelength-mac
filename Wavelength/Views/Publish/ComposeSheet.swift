@@ -60,9 +60,9 @@ struct ComposeSheet: View {
 
         VStack(spacing: 0) {
           HStack(spacing: 2) {
-            formatButton("bold", .bold, "Bold")
-            formatButton("italic", .italic, "Italic")
-            formatButton("link", .link, "Link")
+            formatButton("bold", .bold, "Bold (⌘B)", shortcut: "b")
+            formatButton("italic", .italic, "Italic (⌘I)", shortcut: "i")
+            formatButton("link", .link, "Link (⌘K)", shortcut: "k")
             formatButton("text.quote", .quote, "Quote")
 
             Divider().frame(height: 16).padding(.horizontal, 6)
@@ -90,14 +90,14 @@ struct ComposeSheet: View {
             .overlay(alignment: .topLeading) {
               if composer.content.isEmpty {
                 Text(composer.isEditing ? "Post text" : "Show notes for this episode…")
-                  .foregroundStyle(.tertiary)
-                  .padding(.horizontal, 13)
-                  .padding(.vertical, 10)
+                  .font(.system(size: MarkdownStyle.fontSize))
+                  .foregroundStyle(Color.inkSoft)
+                  .padding(MarkdownStyle.padding)
                   .allowsHitTesting(false)
               }
             }
         }
-        .background(Color.paper, in: .rect(cornerRadius: 8))
+        .background(Color.canvas, in: .rect(cornerRadius: 8))
         .overlay { RoundedRectangle(cornerRadius: 8).strokeBorder(Color.line) }
 
         DisclosureGroup(isExpanded: $showsOptions) {
@@ -212,7 +212,7 @@ struct ComposeSheet: View {
     }
   }
 
-  private func formatButton(_ symbol: String, _ format: MarkdownFormat, _ help: String) -> some View {
+  private func formatButton(_ symbol: String, _ format: MarkdownFormat, _ help: String, shortcut: KeyEquivalent? = nil) -> some View {
     Button {
       editorProxy.apply(format)
     } label: {
@@ -220,6 +220,7 @@ struct ComposeSheet: View {
         .frame(width: 24, height: 20)
     }
     .buttonStyle(.borderless)
+    .keyboardShortcut(shortcut.map { KeyboardShortcut($0) })
     .help(help)
   }
 
