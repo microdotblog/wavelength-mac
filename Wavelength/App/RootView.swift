@@ -20,22 +20,29 @@ struct RootView: View {
 
 private struct MainView: View {
   @Environment(AppModel.self) private var model
+  @Environment(Library.self) private var library
   @State private var columns = NavigationSplitViewVisibility.all
 
   var body: some View {
     @Bindable var model = model
 
-    NavigationSplitView(columnVisibility: $columns) {
-      Sidebar()
-        .navigationSplitViewColumnWidth(min: 190, ideal: 210, max: 280)
-    } content: {
-      content
-        .navigationSplitViewColumnWidth(min: 260, ideal: 320, max: 440)
-    } detail: {
-      detail
-        .safeAreaInset(edge: .bottom, spacing: 0) {
-          NowPlayingBar()
+    Group {
+      if model.sidebar == .podcasts && library.episodes.isEmpty {
+        NavigationSplitView(columnVisibility: $columns) {
+          sidebar
+        } detail: {
+          detail
         }
+      } else {
+        NavigationSplitView(columnVisibility: $columns) {
+          sidebar
+        } content: {
+          content
+            .navigationSplitViewColumnWidth(min: 260, ideal: 320, max: 440)
+        } detail: {
+          detail
+        }
+      }
     }
     .sheet(item: $model.sheet) { sheet in
       switch sheet {
@@ -47,6 +54,11 @@ private struct MainView: View {
         NarrationEditorSheet(postUID: postUID, source: source)
       }
     }
+  }
+
+  private var sidebar: some View {
+    Sidebar()
+      .navigationSplitViewColumnWidth(min: 190, ideal: 210, max: 280)
   }
 
   @ViewBuilder
@@ -65,39 +77,39 @@ private struct MainView: View {
     }
   }
 
-  @ViewBuilder
   private var detail: some View {
-    switch model.sidebar {
-    case .podcasts:
-      if let id = model.selectedEpisodeID {
-        EpisodeEditorView(episodeID: id)
-          .id(id)
-      } else {
-        EmptyStateView(
-          symbol: "waveform",
-          title: "No Episode Selected",
-          message: "Pick an episode to edit it, or record a new one.",
-          actionTitle: "New Episode",
-          action: model.startNewEpisode
-        )
-      }
-    case .narrations, .posts:
-      if let uid = model.selectedPostUID {
-        NarrateView(postUID: uid)
-          .id(uid)
-      } else {
-        EmptyStateView(
-          symbol: "mic",
-          title: "Narrate a Post",
-          message: "Pick a post to read it aloud. Wavelength attaches your narration to the post on Micro.blog."
-        )
-      }
-    case .discover, .listenLater:
-      if let id = model.selectedDiscoverID {
-        DiscoverDetailView(postID: id)
-      } else {
-        EmptyStateView(symbol: "sparkles", title: "Pick an Episode", message: "Choose a podcast to see its details. Double-click to play.")
+    Group {
+      switch model.sidebar {
+      case .podcasts:
+        if library.episodes.isEmpty {
+          EpisodeListView()
+        } else if let id = model.selectedEpisodeID {
+          EpisodeEditorView(episodeID: id)
+            .id(id)
+        } else {
+          Color.clear
         }
+      case .narrations, .posts:
+        if let uid = model.selectedPostUID {
+          NarrateView(postUID: uid)
+            .id(uid)
+        } else {
+          EmptyStateView(
+            symbol: "mic",
+            title: "Narrate a Post",
+            message: "Pick a post to read it aloud. Wavelength attaches your narration to the post on Micro.blog."
+          )
+        }
+      case .discover, .listenLater:
+        if let id = model.selectedDiscoverID {
+          DiscoverDetailView(postID: id)
+        } else {
+          EmptyStateView(symbol: "sparkles", title: "Pick an Episode", message: "Choose a podcast to see its details. Double-click to play.")
+        }
+      }
+    }
+    .safeAreaInset(edge: .bottom, spacing: 0) {
+      NowPlayingBar()
     }
   }
 }
@@ -111,22 +123,21 @@ private struct Sidebar: View {
 
   var body: some View {
     List(selection: selection) {
-      Section("Library") {
-        row(.podcasts, badge: library.episodes.count)
+      row(.podcasts, badge: library.episodes.count)
+      if !posts.narratedPosts.isEmpty {
         row(.narrations, badge: posts.narratedPosts.count)
       }
-
-      Section("Blog") {
-        row(.posts)
-      }
-
-      Section("Listen") {
-        row(.discover)
-        row(.listenLater)
-      }
+      row(.posts)
+      row(.discover)
+      row(.listenLater)
     }
     .safeAreaInset(edge: .bottom, spacing: 0) {
       accountMenu
+    }
+    .onChange(of: posts.narratedPosts.isEmpty, initial: true) { _, isEmpty in
+      if isEmpty && model.sidebar == .narrations {
+        model.sidebar = .posts
+      }
     }
   }
 
@@ -136,6 +147,8 @@ private struct Sidebar: View {
 
   private func row(_ item: SidebarItem, badge: Int = 0) -> some View {
     Label(item.title, systemImage: item.symbol)
+      .font(.system(size: 14, weight: .regular))
+      .foregroundStyle(Color(nsColor: .labelColor))
       .badge(badge)
       .tag(item)
   }

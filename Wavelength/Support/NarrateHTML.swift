@@ -1,4 +1,5 @@
 import Foundation
+import MMMarkdown
 
 nonisolated enum NarrateHTML {
   struct Palette {
@@ -7,12 +8,15 @@ nonisolated enum NarrateHTML {
     let inkSoft: String
     let isDark: Bool
 
-    static let light = Palette(background: "#fffaf0", ink: "#24180d", inkSoft: "#756657", isDark: false)
-    static let dark = Palette(background: "#15100b", ink: "#fff7e8", inkSoft: "#d9c0a8", isDark: true)
+    static let light = Palette(background: "Canvas", ink: "CanvasText", inkSoft: "GrayText", isDark: false)
+    static let dark = Palette(background: "Canvas", ink: "CanvasText", inkSoft: "GrayText", isDark: true)
   }
 
   static func build(title: String, content: String, palette: Palette, fontSize: Int = 20) -> String {
-    let body = PostContent.stripAudioTags(content)
+    let markdown = PostContent.stripAudioTags(content)
+    var error: NSError?
+    let rendered = MMMarkdown.htmlString(withMarkdown: markdown, extensions: [.fencedCodeBlocks, .tables], error: &error)
+    let body = error == nil ? rendered : "<p>\(escape(markdown).replacingOccurrences(of: "\n", with: "<br>"))</p>"
     let safeTitle = escape(title.trimmed)
     let titleHTML = safeTitle.isEmpty ? "" : "<h1>\(safeTitle)</h1>"
 
@@ -23,6 +27,9 @@ nonisolated enum NarrateHTML {
       <meta charset="utf-8">
       <meta name="viewport" content="width=device-width, initial-scale=1">
       <style>
+        :root {
+          color-scheme: \(palette.isDark ? "dark" : "light");
+        }
         html, body {
           margin: 0;
           padding: 0;
@@ -54,16 +61,26 @@ nonisolated enum NarrateHTML {
           border-radius: 8px;
         }
         a {
-          color: \(escape(palette.ink));
+          color: LinkText;
         }
         blockquote {
           margin-left: 0;
           padding-left: 16px;
-          border-left: 3px solid #ff8800;
+          border-left: 3px solid \(escape(palette.inkSoft));
           color: \(escape(palette.inkSoft));
         }
         figcaption, .post .caption {
           color: \(escape(palette.inkSoft));
+        }
+        pre {
+          overflow-x: auto;
+        }
+        table {
+          border-collapse: collapse;
+        }
+        th, td {
+          border: 1px solid \(escape(palette.inkSoft));
+          padding: 4px 8px;
         }
       </style>
     </head>

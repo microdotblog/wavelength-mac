@@ -7,12 +7,9 @@ struct NarrateView: View {
   @Environment(PostsStore.self) private var posts
   @Environment(Recorder.self) private var recorder
   @Environment(Toasts.self) private var toasts
-  @Environment(\.openURL) private var openURL
   @State private var player = SegmentPlayer()
   @State private var take: RecordedTake?
-  @State private var isConfirmingRemove = false
   @State private var isConfirmingDiscard = false
-  @State private var isConfirmingDelete = false
   @AppStorage("teleprompterFontSize") private var fontSize = 20
 
   private var post: Post? { posts.post(postUID) }
@@ -29,7 +26,7 @@ struct NarrateView: View {
           .background(.bar)
       }
       .navigationTitle(post.displayTitle)
-      .toolbar { toolbar(post) }
+      .toolbar { ToolbarSpacer(.flexible) }
       .task(id: playbackURL) {
         await player.load(playbackURL.map { [$0] } ?? [])
       }
@@ -50,24 +47,10 @@ struct NarrateView: View {
           model.pendingNarrationTakes[postUID] = take
         }
       }
-      .confirmationDialog("Delete narration?", isPresented: $isConfirmingRemove) {
-        Button("Delete Narration", role: .destructive) {
-          Task { await model.removeNarration(from: postUID) }
-        }
-      } message: {
-        Text("This removes the audio from the post. The post itself stays.")
-      }
       .confirmationDialog("Discard this take?", isPresented: $isConfirmingDiscard) {
         Button("Discard Take", role: .destructive) { replaceTake(with: nil) }
       } message: {
         Text("The recording hasn’t been saved to your post yet.")
-      }
-      .confirmationDialog("Delete this post?", isPresented: $isConfirmingDelete) {
-        Button("Delete Post", role: .destructive) {
-          Task { await model.delete(post: postUID) }
-        }
-      } message: {
-        Text("This deletes the post from Micro.blog.")
       }
     } else {
       EmptyStateView(symbol: "text.bubble", title: "Post Unavailable", message: "This post is no longer available.")
@@ -153,54 +136,6 @@ struct NarrateView: View {
       Text("\(Formatting.duration(player.currentTime)) / \(Formatting.duration(player.duration))")
         .font(.callout.monospacedDigit())
         .foregroundStyle(.secondary)
-    }
-  }
-
-  @ToolbarContentBuilder
-  private func toolbar(_ post: Post) -> some ToolbarContent {
-    ToolbarSpacer(.flexible)
-
-    ToolbarItemGroup {
-      ControlGroup {
-        Button {
-          fontSize = max(14, fontSize - 2)
-        } label: {
-          Label("Smaller Text", systemImage: "textformat.size.smaller")
-        }
-        Button {
-          fontSize = min(40, fontSize + 2)
-        } label: {
-          Label("Larger Text", systemImage: "textformat.size.larger")
-        }
-      }
-      .help("Teleprompter text size")
-
-      Button {
-        model.sheet = .editPost(postUID: post.uid)
-      } label: {
-        Label("Edit Post", systemImage: "square.and.pencil")
-      }
-
-      Menu {
-        if let url = URL(string: post.url) {
-          Button("Open in Browser", systemImage: "safari") { openURL(url) }
-        }
-
-        if remoteURL != nil || take != nil {
-          Button("Edit Narration Audio…", systemImage: "waveform") { editAudio() }
-            .disabled(recorder.isActive)
-        }
-
-        if remoteURL != nil {
-          Button("Delete Narration…", systemImage: "trash", role: .destructive) { isConfirmingRemove = true }
-            .disabled(recorder.isActive || posts.isAttaching)
-        }
-
-        Divider()
-        Button("Delete Post…", systemImage: "trash", role: .destructive) { isConfirmingDelete = true }
-      } label: {
-        Label("More", systemImage: "ellipsis")
-      }
     }
   }
 

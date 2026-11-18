@@ -49,6 +49,65 @@ struct PostContentTests {
     #expect(html.contains("<p>Read me</p>"))
   }
 
+  @Test func teleprompterRendersMarkdownLinksAndEmphasis() {
+    let html = NarrateHTML.build(
+      title: "",
+      content: "From [the Artificial trailer](https://www.youtube.com/watch?v=example&t=2s), the characterization is _so_ over the top. **Really.**",
+      palette: .light
+    )
+
+    #expect(html.contains("<a href=\"https://www.youtube.com/watch?v=example&amp;t=2s\">the Artificial trailer</a>"))
+    #expect(html.contains("<em>so</em>"))
+    #expect(html.contains("<strong>Really.</strong>"))
+    #expect(!html.contains("[the Artificial trailer]"))
+  }
+
+  @Test func teleprompterRendersMarkdownWithEmbeddedHTML() {
+    let content = """
+    First paragraph with _emphasis_.
+
+    <img src="https://example.com/photo.jpg" alt="A photo">
+
+    - One
+    - Two
+    """
+    let html = NarrateHTML.build(
+      title: "",
+      content: PostContent.narrationAudioTag(for: "https://example.com/audio.m4a") + "\n" + content,
+      palette: .light
+    )
+
+    #expect(html.contains("<p>First paragraph with <em>emphasis</em>.</p>"))
+    #expect(html.contains("<img src=\"https://example.com/photo.jpg\" alt=\"A photo\">"))
+    #expect(html.contains("<ul>"))
+    #expect(html.contains("<li>One</li>"))
+    #expect(html.contains("<li>Two</li>"))
+    #expect(!html.contains("<audio"))
+  }
+
+  @Test func teleprompterRendersFencedCodeAndTables() {
+    let html = NarrateHTML.build(
+      title: "",
+      content: """
+      ```swift
+      let x = 1 < 2
+      ```
+
+      | Episode | Length |
+      | --- | --- |
+      | One | 2:00 |
+      """,
+      palette: .dark
+    )
+
+    #expect(html.contains("<pre><code"))
+    #expect(html.contains("let x = 1 &lt; 2"))
+    #expect(html.contains("<table>"))
+    #expect(html.contains("<td>2:00</td>"))
+    #expect(html.contains("color-scheme: dark;"))
+    #expect(html.contains("background: Canvas;"))
+  }
+
   @Test func plainTextDropsMarkdownLinkTargets() {
     #expect(PostContent.plainText("I've added the [listen later API](https://a/b) today") == "I've added the listen later API today")
   }

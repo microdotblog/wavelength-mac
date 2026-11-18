@@ -25,8 +25,8 @@ enum SidebarItem: String, Hashable, CaseIterable, Identifiable {
     switch self {
     case .podcasts: "waveform"
     case .narrations: "mic"
-    case .posts: "text.bubble"
-    case .discover: "sparkles"
+    case .posts: "doc"
+    case .discover: "magnifyingglass"
     case .listenLater: "bookmark"
     }
   }

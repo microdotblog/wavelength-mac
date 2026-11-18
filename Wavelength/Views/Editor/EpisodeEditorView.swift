@@ -104,17 +104,15 @@ struct EpisodeEditorView: View {
           }
         }
       } else {
-        Button {
+        Button("Post") {
           model.sheet = .publish(episodeID: episode.id)
-        } label: {
-          Label("Publish", systemImage: "paperplane.fill")
         }
         .buttonStyle(.borderedProminent)
-        .help("Publish to Micro.blog (⇧⌘P)")
+        .help("Post to Micro.blog (⇧⌘P)")
       }
 
       Menu {
-        EpisodeMenuItems(episode: episode, rename: startRename, export: export, delete: { isConfirmingDelete = true })
+        EpisodeMenuItems(episode: episode, showsPublish: false, rename: startRename, export: export, delete: { isConfirmingDelete = true })
       } label: {
         Label("More", systemImage: "ellipsis")
       }
@@ -188,6 +186,7 @@ struct EpisodeEditorView: View {
 struct EpisodeMenuItems: View {
   let episode: Episode
   var listen: (() -> Void)?
+  var showsPublish = true
   let rename: () -> Void
   let export: () -> Void
   let delete: () -> Void
@@ -208,11 +207,13 @@ struct EpisodeMenuItems: View {
       if let uid = episode.postID {
         Button("Edit Post…", systemImage: "square.and.pencil") { model.sheet = .editPost(postUID: uid) }
       }
-    } else {
+    } else if showsPublish {
       Button("Publish…", systemImage: "paperplane") { model.sheet = .publish(episodeID: episode.id) }
     }
 
-    Divider()
+    if listen != nil || episode.isPublished || showsPublish {
+      Divider()
+    }
     Button("Rename", systemImage: "pencil", action: rename)
     Button("Duplicate", systemImage: "plus.square.on.square") { model.duplicate(episode: episode.id) }
     Button("Export Audio…", systemImage: "square.and.arrow.up", action: export)

@@ -18,6 +18,8 @@ settings:
 packages:
   LAME:
     path: Packages/LAME
+  MMMarkdown:
+    path: Packages/MMMarkdown
 targets:
   Wavelength:
     type: application
@@ -26,6 +28,7 @@ targets:
       - Wavelength
     dependencies:
       - package: LAME
+      - package: MMMarkdown
     entitlements:
       path: Wavelength/Resources/Wavelength.entitlements
       properties:
