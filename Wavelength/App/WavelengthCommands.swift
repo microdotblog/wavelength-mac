@@ -32,13 +32,15 @@ struct WavelengthCommands: Commands {
     CommandGroup(after: .printItem) {
       Divider()
 
-      Button("Sign Out…") { model.confirmSignOut() }
+      Button("Sign Out") { model.confirmSignOut() }
         .disabled(!model.session.isSignedIn)
     }
 
     CommandMenu("Episode") {
-      Button("Play/Pause") { (episode?.togglePlayback ?? segment?.togglePlayback)?() }
-        .disabled(segment == nil)
+      Button((episode?.isPlaying ?? segment?.isPlaying ?? false) ? "Pause" : "Play") {
+        (episode?.togglePlayback ?? segment?.togglePlayback)?()
+      }
+      .disabled(segment == nil)
 
       Button("Split") { segment?.split?() }
         .keyboardShortcut("t")
@@ -50,16 +52,12 @@ struct WavelengthCommands: Commands {
         .keyboardShortcut("r")
         .disabled(startRecording == nil)
 
-      Button("Pause/Resume Recording") { recording?.togglePause() }
-        .keyboardShortcut("r", modifiers: [.command, .shift])
-        .disabled(recording == nil)
-
       Button("Finish Recording") { recording?.finish() }
         .disabled(recording == nil)
 
       Divider()
 
-      Button("Publish…") { episode?.publish?() }
+      Button("Post…") { episode?.publish?() }
         .keyboardShortcut("p", modifiers: [.command, .shift])
         .disabled(episode?.publish == nil)
 
@@ -68,11 +66,6 @@ struct WavelengthCommands: Commands {
 
       Button("Duplicate") { episode?.duplicate() }
         .keyboardShortcut("d")
-        .disabled(episode == nil)
-
-      Divider()
-
-      Button("Delete Episode…") { episode?.delete() }
         .disabled(episode == nil)
     }
 

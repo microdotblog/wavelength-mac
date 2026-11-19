@@ -102,8 +102,12 @@ struct PostListView: View {
           }
         }
         .contentListFocus()
-        .onDeleteCommand {
-          pendingDelete = posts.post(model.selectedPostUID)
+        // AppKit sends backward Delete as DEL (0x7F).
+        .onKeyPress(keys: [.delete, KeyEquivalent("\u{7F}"), .deleteForward], phases: .down) { press in
+          guard press.modifiers.intersection([.command, .option, .shift, .control]) == .command,
+                let post = posts.post(model.selectedPostUID) else { return .ignored }
+          pendingDelete = post
+          return .handled
         }
       }
     }

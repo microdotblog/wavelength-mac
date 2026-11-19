@@ -124,10 +124,10 @@ struct RecordingPanel<Accessory: View>: View {
       liveWaveform(barWidth: 3, spacing: 2)
         .frame(height: 28)
       pauseButton
-      Button("Discard", role: .destructive) {
+      Button("Cancel", role: .destructive) {
         isConfirmingCancel = true
       }
-      .help("Discard recording")
+      .help("Cancel recording")
       Button("Done", action: finish)
         .buttonStyle(.borderedProminent)
         .keyboardShortcut(.return, modifiers: [.command])

@@ -93,8 +93,8 @@ struct NarrateView: View {
 
         Spacer()
 
-        Button("Discard…") { isConfirmingDiscard = true }
-        Button("Edit Audio…") { editAudio() }
+        Button("Cancel") { isConfirmingDiscard = true }
+        Button("Edit Audio") { editAudio() }
         RecordingPanelButton(title: "Re-record") { newTake in
           model.pendingNarrationTakes[postUID] = newTake
         }

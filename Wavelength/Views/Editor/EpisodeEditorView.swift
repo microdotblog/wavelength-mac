@@ -141,6 +141,7 @@ struct EpisodeEditorView: View {
 
   private func actions(for episode: Episode) -> EpisodeActions {
     EpisodeActions(
+      isPlaying: player.isPlaying || nowPlaying.isPlaying,
       togglePlayback: recorder.isActive ? nil : { togglePlayback() },
       publish: episode.isPublished ? nil : { model.sheet = .publish(episodeID: episode.id) },
       rename: startRename,
@@ -183,8 +184,6 @@ struct EpisodeEditorView: View {
 
 struct EpisodeMenuItems: View {
   let episode: Episode
-  var listen: (() -> Void)?
-  var showsPublish = true
   let rename: () -> Void
   let export: () -> Void
   let delete: () -> Void
@@ -193,10 +192,6 @@ struct EpisodeMenuItems: View {
   @Environment(\.openURL) private var openURL
 
   var body: some View {
-    if let listen {
-      Button("Listen", systemImage: "play.fill", action: listen)
-    }
-
     if episode.isPublished {
       if let url = episode.postURL.flatMap(URL.init(string:)) {
         Button("View Post", systemImage: "safari") { openURL(url) }
@@ -205,11 +200,7 @@ struct EpisodeMenuItems: View {
       if let uid = episode.postID {
         Button("Edit Post…", systemImage: "square.and.pencil") { model.sheet = .editPost(postUID: uid) }
       }
-    } else if showsPublish {
-      Button("Publish…", systemImage: "paperplane") { model.sheet = .publish(episodeID: episode.id) }
-    }
 
-    if listen != nil || episode.isPublished || showsPublish {
       Divider()
     }
     Button("Rename", systemImage: "pencil", action: rename)
@@ -224,6 +215,7 @@ struct EpisodeMenuItems: View {
 }
 
 struct EpisodeActions {
+  let isPlaying: Bool
   let togglePlayback: (() -> Void)?
   let publish: (() -> Void)?
   let rename: () -> Void

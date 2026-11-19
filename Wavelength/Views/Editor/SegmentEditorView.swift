@@ -154,6 +154,7 @@ struct SegmentEditorView: View {
 
   private var segmentActions: SegmentActions {
     SegmentActions(
+      isPlaying: player.isPlaying,
       togglePlayback: { player.toggle() },
       navigate: canNavigate ? { navigate($0) } : nil,
       split: canSplit ? { split() } : nil,
@@ -369,7 +370,7 @@ struct TransportBar: View {
 
       Spacer(minLength: 0)
 
-      Text("\(Formatting.preciseDuration(player.currentTime)) / \(Formatting.duration(player.duration))")
+      Text("\(Formatting.duration(player.currentTime)) / \(Formatting.duration(player.duration))")
         .font(.callout.monospacedDigit())
         .foregroundStyle(.secondary)
         .lineLimit(1)
@@ -393,6 +394,7 @@ struct TransportBar: View {
 }
 
 struct SegmentActions {
+  let isPlaying: Bool
   let togglePlayback: () -> Void
   let navigate: ((AudioNavigation) -> Void)?
   let split: (() -> Void)?

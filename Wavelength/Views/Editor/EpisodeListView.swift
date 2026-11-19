@@ -33,7 +33,6 @@ struct EpisodeListView: View {
               .contextMenu {
                 EpisodeMenuItems(
                   episode: episode,
-                  listen: { model.select(episode: episode.id) },
                   rename: { startRename(episode) },
                   export: { export(episode) },
                   delete: { pendingDelete = episode }
