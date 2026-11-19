@@ -2,6 +2,8 @@ import SwiftUI
 
 struct ComposeSheet: View {
   let mode: Composer.Mode
+  // Set to true to restore the category picker and new-category field.
+  private let showsCategories = false
 
   @Environment(AppModel.self) private var model
   @Environment(Session.self) private var session
@@ -11,6 +13,7 @@ struct ComposeSheet: View {
   @State private var composer: Composer?
   @State private var editorProxy = MarkdownEditorProxy()
   @State private var showsOptions = false
+  @State private var cancelLabelWidth: CGFloat = 0
 
   var body: some View {
     Group {
@@ -44,7 +47,7 @@ struct ComposeSheet: View {
 
           Spacer()
 
-          Label(session.destinationName, systemImage: "globe")
+          Text(session.destinationName)
             .font(.callout)
             .foregroundStyle(.secondary)
         }
@@ -139,12 +142,20 @@ struct ComposeSheet: View {
 
         Spacer()
 
-        Button("Cancel", role: .cancel) { dismiss() }
-          .keyboardShortcut(.cancelAction)
-          .disabled(composer.isBusy)
+        Button(role: .cancel) {
+          dismiss()
+        } label: {
+          Text("Cancel")
+            .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { cancelLabelWidth = $0 }
+        }
+        .keyboardShortcut(.cancelAction)
+        .disabled(composer.isBusy)
 
-        Button(composer.isBusy ? "Posting…" : composer.actionLabel) {
+        Button {
           submit(composer)
+        } label: {
+          Text(composer.isBusy ? "Posting…" : composer.actionLabel)
+            .frame(minWidth: cancelLabelWidth)
         }
         .keyboardShortcut(.return, modifiers: .command)
         .buttonStyle(.borderedProminent)
@@ -177,25 +188,27 @@ struct ComposeSheet: View {
         .fixedSize()
       }
 
-      GridRow {
-        Text("Categories").foregroundStyle(.secondary)
-        VStack(alignment: .leading, spacing: 8) {
-          if !composer.allCategories.isEmpty {
-            FlowLayout {
-              ForEach(composer.allCategories, id: \.self) { category in
-                ChipToggle(title: category, isOn: composer.categories.contains(category)) {
-                  composer.toggleCategory(category)
+      if showsCategories {
+        GridRow {
+          Text("Categories").foregroundStyle(.secondary)
+          VStack(alignment: .leading, spacing: 8) {
+            if !composer.allCategories.isEmpty {
+              FlowLayout {
+                ForEach(composer.allCategories, id: \.self) { category in
+                  ChipToggle(title: category, isOn: composer.categories.contains(category)) {
+                    composer.toggleCategory(category)
+                  }
                 }
               }
             }
-          }
 
-          HStack {
-            TextField("New category", text: $composer.newCategory)
-              .onSubmit(composer.addNewCategory)
-              .frame(maxWidth: 220)
-            Button("Add", action: composer.addNewCategory)
-              .disabled(composer.newCategory.trimmed.isEmpty)
+            HStack {
+              TextField("New category", text: $composer.newCategory)
+                .onSubmit(composer.addNewCategory)
+                .frame(maxWidth: 220)
+              Button("Add", action: composer.addNewCategory)
+                .disabled(composer.newCategory.trimmed.isEmpty)
+            }
           }
         }
       }

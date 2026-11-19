@@ -97,17 +97,7 @@ struct SegmentEditorView: View {
   }
 
   private var transport: some View {
-    HStack(spacing: 12) {
-      if !editor.isLocked {
-        Button("Add File", systemImage: "plus") { isImporting = true }
-          .buttonStyle(.borderless)
-          .labelStyle(.titleAndIcon)
-          .disabled(editor.isWorking)
-          .help("Import Audio… (⇧⌘I)")
-      }
-
-      TransportBar(player: player, canSplit: canSplit, split: editor.isLocked ? nil : { split() })
-    }
+    TransportBar(player: player, canSplit: canSplit, split: editor.isLocked ? nil : { split() })
   }
 
   private var timelineBar: some View {
@@ -116,10 +106,6 @@ struct SegmentEditorView: View {
         Text("\(Formatting.preciseDuration(selectedRange.upperBound - selectedRange.lowerBound)) selected")
           .monospacedDigit()
           .foregroundStyle(.secondary)
-
-        Button("Split", systemImage: "scissors") { carve(.split, range: selectedRange) }
-          .help("Split at the selection edges (⌘T)")
-          .disabled(editor.isWorking)
 
         Button("Delete", systemImage: "trash") { pendingRangeDelete = selectedRange }
           .help("Delete the selected audio (⌫)")
@@ -377,11 +363,15 @@ struct TransportBar: View {
         .fixedSize()
 
       if let split {
-        Button(action: split) {
-          Image(systemName: "scissors")
-        }
-        .disabled(!canSplit)
-        .help("Split at Playhead or Selection (⌘T)")
+        Button("Split", systemImage: "scissors", action: split)
+          .labelStyle(.titleAndIcon)
+          .font(.callout)
+          .buttonStyle(.bordered)
+          .buttonBorderShape(.roundedRectangle(radius: 6))
+          .tint(.gray)
+          .fixedSize()
+          .disabled(!canSplit)
+          .help("Split at Playhead or Selection (⌘T)")
       }
     }
     .buttonStyle(.borderless)

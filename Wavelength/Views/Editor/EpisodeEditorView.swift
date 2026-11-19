@@ -110,12 +110,6 @@ struct EpisodeEditorView: View {
         .buttonStyle(.borderedProminent)
         .help("Post to Micro.blog (⇧⌘P)")
       }
-
-      Menu {
-        EpisodeMenuItems(episode: episode, showsPublish: false, rename: startRename, export: export, delete: { isConfirmingDelete = true })
-      } label: {
-        Label("More", systemImage: "ellipsis")
-      }
     }
   }
 

@@ -29,6 +29,13 @@ struct WavelengthCommands: Commands {
         .disabled(episode == nil)
     }
 
+    CommandGroup(after: .printItem) {
+      Divider()
+
+      Button("Sign Out…") { model.confirmSignOut() }
+        .disabled(!model.session.isSignedIn)
+    }
+
     CommandMenu("Episode") {
       Button("Play/Pause") { (episode?.togglePlayback ?? segment?.togglePlayback)?() }
         .disabled(segment == nil)

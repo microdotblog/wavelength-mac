@@ -20,7 +20,6 @@ private struct AccountSettings: View {
   @Environment(AppModel.self) private var model
   @Environment(Session.self) private var session
   @Environment(\.openURL) private var openURL
-  @State private var isConfirmingSignOut = false
 
   var body: some View {
     Form {
@@ -82,7 +81,7 @@ private struct AccountSettings: View {
         }
 
         Section {
-          Button("Sign Out…", role: .destructive) { isConfirmingSignOut = true }
+          Button("Sign Out…", role: .destructive) { model.confirmSignOut() }
         }
       } else {
         Text("You’re not signed in to Micro.blog.")
@@ -90,11 +89,6 @@ private struct AccountSettings: View {
       }
     }
     .formStyle(.grouped)
-    .confirmationDialog("Sign out of Wavelength?", isPresented: $isConfirmingSignOut) {
-      Button("Sign Out", role: .destructive) { model.signOut() }
-    } message: {
-      Text("Your episodes stay on this Mac.")
-    }
   }
 }
 

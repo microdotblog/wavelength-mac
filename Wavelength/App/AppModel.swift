@@ -155,6 +155,24 @@ final class AppModel {
     await posts.refresh()
   }
 
+  func confirmSignOut() {
+    guard session.isSignedIn else { return }
+
+    let alert = NSAlert()
+    alert.messageText = "Sign out of Wavelength?"
+    alert.informativeText = "Your episodes stay on this Mac."
+    alert.addButton(withTitle: "Sign Out").hasDestructiveAction = true
+    alert.addButton(withTitle: "Cancel")
+
+    if let window = NSApp.keyWindow {
+      alert.beginSheetModal(for: window) { [weak self] response in
+        if response == .alertFirstButtonReturn { self?.signOut() }
+      }
+    } else if alert.runModal() == .alertFirstButtonReturn {
+      signOut()
+    }
+  }
+
   func signOut() {
     nowPlaying.stop()
     recorder.cancel()

@@ -120,7 +120,6 @@ private struct Sidebar: View {
   @Environment(Session.self) private var session
   @Environment(Library.self) private var library
   @Environment(PostsStore.self) private var posts
-  @Environment(\.openSettings) private var openSettings
 
   var body: some View {
     List(selection: selection) {
@@ -133,7 +132,7 @@ private struct Sidebar: View {
       row(.listenLater)
     }
     .safeAreaInset(edge: .bottom, spacing: 0) {
-      accountMenu
+      accountSummary
     }
     .onChange(of: posts.narratedPosts.isEmpty, initial: true) { _, isEmpty in
       if isEmpty && model.sidebar == .narrations {
@@ -156,51 +155,23 @@ private struct Sidebar: View {
       .tag(item)
   }
 
-  private var accountMenu: some View {
-    Menu {
-      if !session.destinations.isEmpty {
-        Picker("Blog", selection: Binding(
-          get: { session.selectedDestination?.uid ?? "" },
-          set: { uid in
-            if let destination = session.destinations.first(where: { $0.uid == uid }) {
-              session.select(destination)
-              Task { await posts.refresh() }
-            }
-          }
-        )) {
-          ForEach(session.destinations) { destination in
-            Text(destination.name).tag(destination.uid)
-          }
-        }
-        .pickerStyle(.inline)
-
-        Divider()
-      }
-
-      Button("Settings…") { openSettings() }
-      Button("Sign Out") { model.signOut() }
-    } label: {
-      HStack(spacing: 8) {
-        AvatarView(url: session.profile?.photo, size: 26)
-        VStack(alignment: .leading, spacing: 0) {
-          Text(session.displayName)
-            .font(.callout.weight(.semibold))
-            .lineLimit(1)
-          Text(session.destinationName)
+  private var accountSummary: some View {
+    HStack(spacing: 8) {
+      AvatarView(url: session.profile?.photo, size: 26)
+      VStack(alignment: .leading, spacing: 0) {
+        Text(session.displayName)
+          .font(.callout.weight(.semibold))
+          .lineLimit(1)
+        if let username = session.profile?.username {
+          Text("@\(username)")
             .font(.caption)
             .foregroundStyle(.secondary)
             .lineLimit(1)
         }
-        Spacer(minLength: 0)
-        Image(systemName: "chevron.up.chevron.down")
-          .font(.caption)
-          .foregroundStyle(.tertiary)
       }
-      .contentShape(.rect)
+      Spacer(minLength: 0)
     }
-    .menuStyle(.button)
-    .buttonStyle(.plain)
-    .menuIndicator(.hidden)
+    .accessibilityElement(children: .combine)
     .padding(10)
   }
 }
