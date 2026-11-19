@@ -21,6 +21,9 @@ struct EpisodeListView: View {
           actionTitle: "New Episode",
           action: model.startNewEpisode
         )
+        .focusable(interactions: .edit)
+        .focusEffectDisabled()
+        .contentListFocus()
       } else {
         List(selection: $model.selectedEpisodeID) {
           ForEach(library.sortedEpisodes) { episode in
@@ -37,6 +40,7 @@ struct EpisodeListView: View {
               }
           }
         }
+        .contentListFocus()
         .environment(\.defaultMinListRowHeight, EpisodeRow.height)
         .onKeyPress(.space, phases: .down) { _ in
           guard let togglePlayback = episode?.togglePlayback else { return .ignored }

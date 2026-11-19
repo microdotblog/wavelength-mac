@@ -1,5 +1,30 @@
 import SwiftUI
 
+extension View {
+  func contentListFocus() -> some View {
+    modifier(ContentListFocus())
+  }
+}
+
+private struct ContentListFocus: ViewModifier {
+  @Environment(AppModel.self) private var model
+  @FocusState private var isFocused: Bool
+
+  func body(content: Content) -> some View {
+    content
+      .focused($isFocused)
+      .task(id: model.contentFocusRequest) {
+        guard let request = model.contentFocusRequest else { return }
+
+        isFocused = false
+        // Let a newly selected navigation column finish mounting before focusing it.
+        await Task.yield()
+        guard !Task.isCancelled, model.contentFocusRequest == request else { return }
+        isFocused = true
+      }
+  }
+}
+
 struct EmptyStateView: View {
   let symbol: String
   let title: String

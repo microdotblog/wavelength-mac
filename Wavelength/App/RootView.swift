@@ -59,6 +59,7 @@ private struct MainView: View {
   private var sidebar: some View {
     Sidebar()
       .navigationSplitViewColumnWidth(min: 190, ideal: 210, max: 280)
+      .toolbar(removing: .sidebarToggle)
   }
 
   @ViewBuilder
@@ -136,19 +137,21 @@ private struct Sidebar: View {
     }
     .onChange(of: posts.narratedPosts.isEmpty, initial: true) { _, isEmpty in
       if isEmpty && model.sidebar == .narrations {
-        model.sidebar = .posts
+        model.showSection(.posts, focusContent: false)
       }
     }
   }
 
   private var selection: Binding<SidebarItem?> {
-    Binding(get: { model.sidebar }, set: { if let item = $0 { model.sidebar = item } })
+    Binding(
+      get: { model.sidebar },
+      set: { if let item = $0 { model.showSection(item, focusContent: false) } }
+    )
   }
 
   private func row(_ item: SidebarItem, badge: Int = 0) -> some View {
     Label(item.title, systemImage: item.symbol)
       .font(.system(size: 14, weight: .regular))
-      .foregroundStyle(Color(nsColor: .labelColor))
       .badge(badge)
       .tag(item)
   }

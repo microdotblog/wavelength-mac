@@ -10,19 +10,20 @@ struct WavelengthCommands: Commands {
   @Environment(\.openWindow) private var openWindow
 
   var body: some Commands {
+    @Bindable var posts = model.posts
     let _ = model.openMainWindow = { openWindow(id: WindowID.main) }
 
     CommandGroup(replacing: .newItem) {
       Button("New Episode") { model.startNewEpisode() }
         .keyboardShortcut("n")
         .disabled(!model.session.isSignedIn)
-
-      Button("Add Audio File…") { segment?.importAudio?() }
-        .keyboardShortcut("i", modifiers: [.command, .shift])
-        .disabled(segment?.importAudio == nil)
     }
 
-    CommandGroup(replacing: .saveItem) {
+    CommandGroup(replacing: .importExport) {
+      Button("Import Audio…") { segment?.importAudio?() }
+        .keyboardShortcut("i", modifiers: [.command, .shift])
+        .disabled(segment?.importAudio == nil)
+
       Button("Export Audio…") { episode?.export() }
         .keyboardShortcut("e")
         .disabled(episode == nil)
@@ -86,10 +87,21 @@ struct WavelengthCommands: Commands {
 
     CommandGroup(before: .sidebar) {
       ForEach(Array(SidebarItem.allCases.enumerated()), id: \.element) { index, item in
-        Button(item.title) { model.sidebar = item }
+        Button(item.title) { model.showSection(item) }
           .keyboardShortcut(KeyEquivalent(Character("\(index + 1)")))
           .disabled(item == .narrations && model.posts.narratedPosts.isEmpty)
       }
+
+      Divider()
+
+      Picker("Filter Posts", selection: $posts.filter) {
+        ForEach(PostsStore.Filter.allCases) { filter in
+          Text(filter.label).tag(filter)
+        }
+      }
+      .pickerStyle(.inline)
+      .labelsHidden()
+      .disabled(model.sidebar != .posts)
 
       Divider()
     }

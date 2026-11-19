@@ -67,7 +67,8 @@ final class AppModel {
   let signInCard = CardWindowController()
   let recordingCard = CardWindowController()
 
-  var sidebar: SidebarItem = .podcasts
+  private(set) var sidebar: SidebarItem = .podcasts
+  private(set) var contentFocusRequest: UUID?
   var selectedEpisodeID: String?
   var selectedPostUID: String?
   var selectedDiscoverID: String?
@@ -180,12 +181,17 @@ final class AppModel {
   }
 
   func select(episode id: String) {
-    sidebar = .podcasts
+    showSection(.podcasts)
     selectedEpisodeID = id
   }
 
-  func select(post uid: String, in item: SidebarItem = .posts) {
+  func showSection(_ item: SidebarItem, focusContent: Bool = true) {
     sidebar = item
+    contentFocusRequest = focusContent ? UUID() : nil
+  }
+
+  func select(post uid: String, in item: SidebarItem = .posts) {
+    showSection(item)
     selectedPostUID = uid
   }
 

@@ -103,7 +103,7 @@ struct SegmentEditorView: View {
           .buttonStyle(.borderless)
           .labelStyle(.titleAndIcon)
           .disabled(editor.isWorking)
-          .help("Add Audio File… (⇧⌘I)")
+          .help("Import Audio… (⇧⌘I)")
       }
 
       TransportBar(player: player, canSplit: canSplit, split: editor.isLocked ? nil : { split() })

@@ -17,15 +17,20 @@ struct DiscoverListView: View {
 
     Group {
       if posts.isEmpty {
-        if state.isLoading || !state.didHydrate {
-          ProgressView()
-        } else if let message = state.errorMessage {
-          EmptyStateView(symbol: "exclamationmark.triangle", title: "Couldn’t Load \(feed.title)", message: message, actionTitle: "Try Again") {
-            Task { await discover.refresh(feed) }
+        Group {
+          if state.isLoading || !state.didHydrate {
+            ProgressView()
+          } else if let message = state.errorMessage {
+            EmptyStateView(symbol: "exclamationmark.triangle", title: "Couldn’t Load \(feed.title)", message: message, actionTitle: "Try Again") {
+              Task { await discover.refresh(feed) }
+            }
+          } else {
+            EmptyStateView(symbol: feed == .discover ? "sparkles" : "bookmark", title: feed.emptyTitle, message: feed.emptyBody)
           }
-        } else {
-          EmptyStateView(symbol: feed == .discover ? "sparkles" : "bookmark", title: feed.emptyTitle, message: feed.emptyBody)
         }
+        .focusable(interactions: .edit)
+        .focusEffectDisabled()
+        .contentListFocus()
       } else {
         List(selection: $model.selectedDiscoverID) {
           ForEach(posts) { post in
@@ -47,6 +52,7 @@ struct DiscoverListView: View {
             }
           }
         }
+        .contentListFocus()
         .contextMenu(forSelectionType: String.self) { _ in
         } primaryAction: { ids in
           if let id = ids.first, let post = discover.post(id) {
@@ -269,7 +275,7 @@ struct NowPlayingBar: View {
       HStack(spacing: 14) {
         Button {
           if model.sidebar.feed == nil {
-            model.sidebar = .discover
+            model.showSection(.discover)
           }
 
           model.selectedDiscoverID = post.id

@@ -40,7 +40,7 @@ nonisolated enum NarrateHTML {
           line-height: 1.6;
         }
         body {
-          padding: 40px 32px 64px;
+          padding: 16px 32px 64px;
         }
         main {
           max-width: 720px;

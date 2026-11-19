@@ -22,20 +22,77 @@ struct PostListView: View {
   }
 
   var body: some View {
+    column
+      .toolbar {
+        ToolbarItem {
+          Button {
+            Task { await posts.refresh() }
+          } label: {
+            Label("Refresh", systemImage: "arrow.clockwise")
+          }
+          .disabled(posts.isLoading)
+        }
+      }
+      .task {
+        if !posts.didHydrate {
+          await posts.refresh()
+        }
+      }
+      .confirmationDialog(
+        "Delete this post?",
+        isPresented: Binding(get: { pendingDelete != nil }, set: { if !$0 { pendingDelete = nil } }),
+        presenting: pendingDelete
+      ) { post in
+        Button("Delete Post", role: .destructive) {
+          Task { await model.delete(post: post.uid) }
+        }
+      } message: { _ in
+        Text("This deletes the post from Micro.blog.")
+      }
+  }
+
+  @ViewBuilder
+  private var column: some View {
+    switch source {
+    case .all:
+      postList
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .safeAreaInset(edge: .top, spacing: 0) {
+          if posts.filter != .all {
+            filterBar
+          }
+        }
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+          postsFooter
+        }
+        .navigationTitle("Posts")
+    case .narrations:
+      postList
+        .navigationTitle("Narrations")
+        .navigationSubtitle(session.destinationName)
+    }
+  }
+
+  @ViewBuilder
+  private var postList: some View {
     @Bindable var model = model
-    @Bindable var posts = posts
 
     Group {
       if visiblePosts.isEmpty {
-        if posts.isLoading || !posts.didHydrate {
-          ProgressView()
-        } else if let message = posts.errorMessage {
-          EmptyStateView(symbol: "exclamationmark.triangle", title: "Couldn’t Load Posts", message: message, actionTitle: "Try Again") {
-            Task { await posts.refresh() }
+        Group {
+          if posts.isLoading || !posts.didHydrate {
+            ProgressView()
+          } else if let message = posts.errorMessage {
+            EmptyStateView(symbol: "exclamationmark.triangle", title: "Couldn’t Load Posts", message: message, actionTitle: "Try Again") {
+              Task { await posts.refresh() }
+            }
+          } else {
+            emptyState
           }
-        } else {
-          emptyState
         }
+        .focusable(interactions: .edit)
+        .focusEffectDisabled()
+        .contentListFocus()
       } else {
         List(selection: $model.selectedPostUID) {
           ForEach(visiblePosts) { post in
@@ -44,61 +101,52 @@ struct PostListView: View {
               .contextMenu { menu(for: post) }
           }
         }
+        .contentListFocus()
         .onDeleteCommand {
           pendingDelete = posts.post(model.selectedPostUID)
         }
       }
     }
-    .safeAreaInset(edge: .top, spacing: 0) {
-      if source == .all && posts.filter != .all {
-        filterBar
-      }
-    }
-    .navigationTitle(source == .all ? "Posts" : "Narrations")
-    .navigationSubtitle(session.destinationName)
-    .toolbar {
-      if source == .all {
-        ToolbarItem(placement: .navigation) {
-          Menu {
-            Picker("Filter", selection: $posts.filter) {
-              ForEach(PostsStore.Filter.allCases) { filter in
-                Text(filter.label).tag(filter)
-              }
-            }
-            .pickerStyle(.inline)
-            .labelsHidden()
-          } label: {
-            Label("Filter", systemImage: posts.filter == .all ? "line.3.horizontal.decrease" : "line.3.horizontal.decrease.circle.fill")
-          }
-          .help("Filter posts")
-        }
-      }
+  }
 
-      ToolbarItem {
-        Button {
-          Task { await posts.refresh() }
-        } label: {
-          Label("Refresh", systemImage: "arrow.clockwise")
+  private var postsFooter: some View {
+    VStack(spacing: 0) {
+      Divider()
+
+      Menu {
+        Picker("Blog", selection: blogSelection) {
+          ForEach(session.destinations) { destination in
+            Text(destination.name).tag(destination.uid)
+          }
         }
-        .disabled(posts.isLoading)
+        .pickerStyle(.inline)
+        .labelsHidden()
+      } label: {
+        Text(session.destinationName)
+          .lineLimit(1)
       }
+      .menuStyle(.borderlessButton)
+      .help("Choose a blog")
+      .disabled(session.destinations.isEmpty || posts.isLoading)
+      .padding(.horizontal, 12)
+      .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
     }
-    .task {
-      if !posts.didHydrate {
-        await posts.refresh()
+    .background(.bar)
+  }
+
+  private var blogSelection: Binding<String> {
+    Binding(
+      get: { session.destinationUID ?? "" },
+      set: { uid in
+        guard !posts.isLoading, uid != session.destinationUID,
+              let destination = session.destinations.first(where: { $0.uid == uid }) else { return }
+
+        session.select(destination)
+        model.selectedPostUID = nil
+        posts.reset()
+        Task { await posts.refresh() }
       }
-    }
-    .confirmationDialog(
-      "Delete this post?",
-      isPresented: Binding(get: { pendingDelete != nil }, set: { if !$0 { pendingDelete = nil } }),
-      presenting: pendingDelete
-    ) { post in
-      Button("Delete Post", role: .destructive) {
-        Task { await model.delete(post: post.uid) }
-      }
-    } message: { _ in
-      Text("This deletes the post from Micro.blog.")
-    }
+    )
   }
 
   private var filterBar: some View {
