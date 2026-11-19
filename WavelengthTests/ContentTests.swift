@@ -3,6 +3,52 @@ import Foundation
 import Testing
 @testable import Wavelength
 
+struct AudioNavigationTests {
+  private let boundaries = [0.0, 2.0, 5.0]
+  private let duration = 9.0
+
+  private func destination(_ movement: AudioNavigation, from time: Double) -> Double {
+    movement.destination(from: time, duration: duration, boundaries: boundaries)
+  }
+
+  @Test func stepsOneSecondAndStopsAtTheEnds() {
+    #expect(destination(.backwardSecond, from: 3.5) == 2.5)
+    #expect(destination(.forwardSecond, from: 3.5) == 4.5)
+    #expect(destination(.backwardSecond, from: 0.2) == 0)
+    #expect(destination(.forwardSecond, from: 8.8) == duration)
+  }
+
+  @Test func movesThroughEverySegmentBoundaryInBothDirections() {
+    var time = 0.0
+    for expected in [2.0, 5.0, 9.0, 9.0] {
+      time = destination(.nextSegment, from: time)
+      #expect(time == expected)
+    }
+
+    for expected in [5.0, 2.0, 0.0, 0.0] {
+      time = destination(.previousSegment, from: time)
+      #expect(time == expected)
+    }
+  }
+
+  @Test func jumpsFromWithinASegmentToItsSurroundingBoundaries() {
+    #expect(destination(.previousSegment, from: 3) == 2)
+    #expect(destination(.nextSegment, from: 3) == 5)
+    #expect(destination(.nextSegment, from: 6) == duration)
+  }
+
+  @Test func toleratesRoundingAtSegmentBoundaries() {
+    #expect(destination(.previousSegment, from: 2.00001) == 0)
+    #expect(destination(.nextSegment, from: 1.99999) == 5)
+  }
+
+  @Test func jumpsToRecordingEndpoints() {
+    #expect(destination(.beginning, from: 4) == 0)
+    #expect(destination(.end, from: 4) == duration)
+    #expect(AudioNavigation.end.destination(from: 0, duration: 0, boundaries: []) == 0)
+  }
+}
+
 struct PostContentTests {
   @Test func classifiesVisibleAudioAsPodcast() {
     #expect(PostContent.kind(of: "<p>Hi</p><audio src=\"a.mp3\" controls></audio>") == .podcast)

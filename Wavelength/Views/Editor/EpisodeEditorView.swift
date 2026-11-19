@@ -104,10 +104,14 @@ struct EpisodeEditorView: View {
           }
         }
       } else {
-        Button("Post") {
+        Button {
           model.sheet = .publish(episodeID: episode.id)
+        } label: {
+          Text("Post…")
+            .frame(minWidth: 44)
         }
-        .buttonStyle(.borderedProminent)
+        .buttonStyle(.bordered)
+        .buttonBorderShape(.capsule)
         .help("Post to Micro.blog (⇧⌘P)")
       }
     }

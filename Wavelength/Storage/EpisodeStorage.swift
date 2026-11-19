@@ -6,7 +6,15 @@ nonisolated struct EpisodeStorage: Sendable {
   let root: URL
 
   static var standard: EpisodeStorage {
-    EpisodeStorage(root: AppDirectories.support.appending(path: "episodes"))
+    let root = AppDirectories.support.appending(path: "Episodes")
+    let legacyRoot = AppDirectories.support.appending(path: "episodes")
+
+    // Keep existing libraries accessible on case-sensitive volumes.
+    if !FileManager.default.fileExists(atPath: root.path), FileManager.default.fileExists(atPath: legacyRoot.path) {
+      return EpisodeStorage(root: legacyRoot)
+    }
+
+    return EpisodeStorage(root: root)
   }
 
   func folder(_ id: String) -> SegmentFolder {

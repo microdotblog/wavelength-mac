@@ -5,6 +5,7 @@ struct EpisodeListView: View {
   @Environment(Library.self) private var library
   @Environment(Toasts.self) private var toasts
   @FocusedValue(\.episodeActions) private var episode
+  @FocusedValue(\.segmentActions) private var segment
   @State private var pendingDelete: Episode?
   @State private var renaming: Episode?
   @State private var renameDraft = ""
@@ -41,6 +42,7 @@ struct EpisodeListView: View {
           }
         }
         .contentListFocus()
+        .audioNavigationShortcuts(segment?.navigate)
         .environment(\.defaultMinListRowHeight, EpisodeRow.height)
         .onKeyPress(.space, phases: .down) { _ in
           guard let togglePlayback = episode?.togglePlayback else { return .ignored }

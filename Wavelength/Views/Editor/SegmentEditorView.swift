@@ -8,6 +8,7 @@ struct SegmentEditorView: View {
   var focusTitle: String?
 
   @Environment(Toasts.self) private var toasts
+  @Environment(Recorder.self) private var recorder
   @State private var selectedSegment: String?
   @State private var selectedRange: ClosedRange<Double>?
   @State private var viewport = TimelineViewport()
@@ -63,6 +64,7 @@ struct SegmentEditorView: View {
       selectedRange = nil
     }
     .focusedSceneValue(\.segmentActions, segmentActions)
+    .audioNavigationShortcuts(canNavigate ? { navigate($0) } : nil)
     .fileImporter(isPresented: $isImporting, allowedContentTypes: [.audio]) { result in
       if case .success(let url) = result {
         importAudio(url)
@@ -153,12 +155,23 @@ struct SegmentEditorView: View {
   private var segmentActions: SegmentActions {
     SegmentActions(
       togglePlayback: { player.toggle() },
+      navigate: canNavigate ? { navigate($0) } : nil,
       split: canSplit ? { split() } : nil,
       importAudio: editor.isLocked ? nil : { isImporting = true },
       zoomIn: viewport.zoom < viewport.maxZoom ? { viewport.zoom(by: 1.5, around: player.currentTime) } : nil,
       zoomOut: viewport.zoom > 1 ? { viewport.zoom(by: 1 / 1.5, around: player.currentTime) } : nil,
       zoomToFit: viewport.zoom > 1 ? { viewport.setZoom(1) } : nil
     )
+  }
+
+  private var canNavigate: Bool {
+    player.duration > 0 && !player.isLoading && !editor.isWorking && !recorder.isActive
+  }
+
+  private func navigate(_ movement: AudioNavigation) {
+    selectedRange = nil
+    player.navigate(movement)
+    selectedSegment = currentSegment?.name
   }
 
   private var isConfirmingDelete: Binding<Bool> {
@@ -381,6 +394,7 @@ struct TransportBar: View {
 
 struct SegmentActions {
   let togglePlayback: () -> Void
+  let navigate: ((AudioNavigation) -> Void)?
   let split: (() -> Void)?
   let importAudio: (() -> Void)?
   let zoomIn: (() -> Void)?
@@ -390,4 +404,24 @@ struct SegmentActions {
 
 extension FocusedValues {
   @Entry var segmentActions: SegmentActions?
+}
+
+extension View {
+  func audioNavigationShortcuts(_ navigate: ((AudioNavigation) -> Void)?) -> some View {
+    onKeyPress(keys: [.leftArrow, .rightArrow], phases: [.down, .repeat]) { press in
+      guard let navigate else { return .ignored }
+
+      let forward = press.key == .rightArrow
+      let movement: AudioNavigation
+      switch press.modifiers.intersection([.command, .option, .shift, .control]) {
+      case []: movement = forward ? .forwardSecond : .backwardSecond
+      case .option: movement = forward ? .nextSegment : .previousSegment
+      case .command: movement = forward ? .end : .beginning
+      default: return .ignored
+      }
+
+      navigate(movement)
+      return .handled
+    }
+  }
 }

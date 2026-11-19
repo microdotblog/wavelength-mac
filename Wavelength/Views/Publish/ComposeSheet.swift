@@ -1,9 +1,11 @@
+import AppKit
 import SwiftUI
 
 struct ComposeSheet: View {
   let mode: Composer.Mode
   // Set to true to restore the category picker and new-category field.
   private let showsCategories = false
+  private let actionLabelMinimumWidth: CGFloat = 56
 
   @Environment(AppModel.self) private var model
   @Environment(Session.self) private var session
@@ -11,9 +13,7 @@ struct ComposeSheet: View {
   @Environment(\.dismiss) private var dismiss
   @Environment(\.openURL) private var openURL
   @State private var composer: Composer?
-  @State private var editorProxy = MarkdownEditorProxy()
   @State private var showsOptions = false
-  @State private var cancelLabelWidth: CGFloat = 0
 
   var body: some View {
     Group {
@@ -58,50 +58,22 @@ struct ComposeSheet: View {
             .font(.title3.weight(.semibold))
             .padding(10)
             .background(Color.paper, in: .rect(cornerRadius: 8))
-            .overlay { RoundedRectangle(cornerRadius: 8).strokeBorder(Color.line) }
+            .overlay { RoundedRectangle(cornerRadius: 8).strokeBorder(Color(nsColor: .separatorColor)) }
         }
 
-        VStack(spacing: 0) {
-          HStack(spacing: 2) {
-            formatButton("bold", .bold, "Bold (⌘B)", shortcut: "b")
-            formatButton("italic", .italic, "Italic (⌘I)", shortcut: "i")
-            formatButton("link", .link, "Link (⌘K)", shortcut: "k")
-            formatButton("text.quote", .quote, "Quote")
-
-            Divider().frame(height: 16).padding(.horizontal, 6)
-
-            if !composer.shouldShowTitle {
-              Button("Add Title") { composer.showsTitle = true }
-                .buttonStyle(.borderless)
-                .font(.callout)
+        PlainTextEditor(text: $composer.content)
+          .frame(minHeight: 220)
+          .overlay(alignment: .topLeading) {
+            if composer.content.isEmpty {
+              Text(composer.isEditing ? "Post text" : "Show notes for this episode…")
+                .font(.system(size: PlainTextEditor.fontSize))
+                .foregroundStyle(Color.inkSoft)
+                .padding(PlainTextEditor.padding)
+                .allowsHitTesting(false)
             }
-
-            Spacer()
-
-            Text("\(composer.content.count)")
-              .font(.caption.monospacedDigit())
-              .foregroundStyle(composer.content.count > Composer.shortPostLength ? Color.accentColor : .secondary)
-              .help("Posts longer than \(Composer.shortPostLength) characters get a title on Micro.blog.")
           }
-          .padding(.horizontal, 8)
-          .padding(.vertical, 6)
-
-          Divider()
-
-          MarkdownEditor(text: $composer.content, proxy: editorProxy, placeholder: "Show notes")
-            .frame(minHeight: 220)
-            .overlay(alignment: .topLeading) {
-              if composer.content.isEmpty {
-                Text(composer.isEditing ? "Post text" : "Show notes for this episode…")
-                  .font(.system(size: MarkdownStyle.fontSize))
-                  .foregroundStyle(Color.inkSoft)
-                  .padding(MarkdownStyle.padding)
-                  .allowsHitTesting(false)
-              }
-            }
-        }
-        .background(Color.canvas, in: .rect(cornerRadius: 8))
-        .overlay { RoundedRectangle(cornerRadius: 8).strokeBorder(Color.line) }
+          .background(Color.canvas, in: .rect(cornerRadius: 8))
+          .overlay { RoundedRectangle(cornerRadius: 8).strokeBorder(Color.line) }
 
         if case .publish(let episodeID) = mode, let episode = model.library.episode(episodeID) {
           EpisodeAttachmentCard(episode: episode, isPublishing: composer.isBusy)
@@ -146,16 +118,17 @@ struct ComposeSheet: View {
           dismiss()
         } label: {
           Text("Cancel")
-            .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { cancelLabelWidth = $0 }
+            .frame(minWidth: actionLabelMinimumWidth)
         }
         .keyboardShortcut(.cancelAction)
+        .buttonStyle(.bordered)
         .disabled(composer.isBusy)
 
         Button {
           submit(composer)
         } label: {
           Text(composer.isBusy ? "Posting…" : composer.actionLabel)
-            .frame(minWidth: cancelLabelWidth)
+            .frame(minWidth: actionLabelMinimumWidth)
         }
         .keyboardShortcut(.return, modifiers: .command)
         .buttonStyle(.borderedProminent)
@@ -229,18 +202,6 @@ struct ComposeSheet: View {
     }
   }
 
-  private func formatButton(_ symbol: String, _ format: MarkdownFormat, _ help: String, shortcut: KeyEquivalent? = nil) -> some View {
-    Button {
-      editorProxy.apply(format)
-    } label: {
-      Image(systemName: symbol)
-        .frame(width: 24, height: 20)
-    }
-    .buttonStyle(.borderless)
-    .keyboardShortcut(shortcut.map { KeyboardShortcut($0) })
-    .help(help)
-  }
-
   private func submit(_ composer: Composer) {
     Task {
       if await composer.submit() {
@@ -253,6 +214,69 @@ struct ComposeSheet: View {
         }
         dismiss()
       }
+    }
+  }
+}
+
+// The Markdown editor is retained separately; the composer currently uses native plain-text editing.
+private struct PlainTextEditor: NSViewRepresentable {
+  static let fontSize: CGFloat = 18
+  static let padding: CGFloat = 13
+
+  @Binding var text: String
+
+  func makeCoordinator() -> Coordinator {
+    Coordinator(text: $text)
+  }
+
+  func makeNSView(context: Context) -> NSScrollView {
+    let scrollView = NSScrollView()
+    scrollView.drawsBackground = false
+    scrollView.hasVerticalScroller = true
+
+    let textView = NSTextView(frame: .zero)
+    textView.minSize = .zero
+    textView.maxSize = NSSize(width: CGFloat.greatestFiniteMagnitude, height: .greatestFiniteMagnitude)
+    textView.isVerticallyResizable = true
+    textView.isHorizontallyResizable = false
+    textView.autoresizingMask = .width
+    textView.textContainer?.widthTracksTextView = true
+    textView.isRichText = false
+    textView.importsGraphics = false
+    textView.allowsUndo = true
+    textView.drawsBackground = false
+    textView.font = .systemFont(ofSize: Self.fontSize)
+    textView.textColor = .textColor
+    textView.insertionPointColor = .textColor
+    textView.textContainerInset = NSSize(width: Self.padding, height: Self.padding)
+    textView.textContainer?.lineFragmentPadding = 0
+    textView.isContinuousSpellCheckingEnabled = true
+    textView.delegate = context.coordinator
+    textView.string = text
+    textView.setAccessibilityLabel("Show notes")
+    scrollView.documentView = textView
+    return scrollView
+  }
+
+  func updateNSView(_ scrollView: NSScrollView, context: Context) {
+    context.coordinator.text = $text
+    guard let textView = scrollView.documentView as? NSTextView else { return }
+
+    if textView.string != text {
+      textView.string = text
+    }
+  }
+
+  final class Coordinator: NSObject, NSTextViewDelegate {
+    var text: Binding<String>
+
+    init(text: Binding<String>) {
+      self.text = text
+    }
+
+    func textDidChange(_ notification: Notification) {
+      guard let textView = notification.object as? NSTextView else { return }
+      text.wrappedValue = textView.string
     }
   }
 }

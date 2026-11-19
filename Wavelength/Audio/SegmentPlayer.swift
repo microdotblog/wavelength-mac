@@ -1,6 +1,27 @@
 import AVFoundation
 import Observation
 
+nonisolated enum AudioNavigation {
+  case backwardSecond
+  case forwardSecond
+  case previousSegment
+  case nextSegment
+  case beginning
+  case end
+
+  func destination(from time: Double, duration: Double, boundaries: [Double]) -> Double {
+    let target: Double = switch self {
+    case .backwardSecond: time - 1
+    case .forwardSecond: time + 1
+    case .previousSegment: boundaries.last { $0 < time - 0.0001 } ?? 0
+    case .nextSegment: boundaries.first { $0 > time + 0.0001 } ?? duration
+    case .beginning: 0
+    case .end: duration
+    }
+    return min(max(target, 0), max(duration, 0))
+  }
+}
+
 @Observable
 final class SegmentPlayer {
   private(set) var isPlaying = false
@@ -176,6 +197,10 @@ final class SegmentPlayer {
 
   func skip(by seconds: Double) {
     seek(to: currentTime + seconds)
+  }
+
+  func navigate(_ movement: AudioNavigation) {
+    seek(to: movement.destination(from: currentTime, duration: duration, boundaries: boundaries))
   }
 
   func play(segment index: Int) {

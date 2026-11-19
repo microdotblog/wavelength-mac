@@ -213,9 +213,7 @@ struct SegmentTimeline<Menu: View>: View {
         viewport.duration = total
       }
       .onChange(of: player.currentTime) { _, time in
-        if player.isPlaying {
-          viewport.reveal(layout.x(at: time))
-        }
+        viewport.reveal(layout.x(at: time))
       }
       .onChange(of: segments.map(\.id)) {
         drag = nil

@@ -88,7 +88,7 @@ struct EpisodeAttachmentCard: View {
     }
     .padding(12)
     .background(Color.paper, in: .rect(cornerRadius: 14))
-    .overlay { RoundedRectangle(cornerRadius: 14).strokeBorder(Color.line) }
+    .overlay { RoundedRectangle(cornerRadius: 14).strokeBorder(Color(nsColor: .separatorColor)) }
     .task(id: urls) {
       await player.load(urls)
     }
