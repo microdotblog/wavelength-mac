@@ -4,5 +4,21 @@
 		<title>Wavelength for Mac</title>
 		<description>Most recent changes with links to updates.</description>
 		<language>en</language>
+		<item>
+			<title>Version 1.0</title>
+			<description><![CDATA[
+				<style>
+					ul {
+						margin-left: 0px; padding-left: 20px;
+					}
+					li {
+						padding: 2px;
+					}
+				</style>
+				<p>First version!</p>
+			]]></description>
+			<pubDate>Tue, 10 Nov 2026 15:30:00 -0500</pubDate>
+			<enclosure url="" sparkle:shortVersionString="1.0" sparkle:version="1" length="" type="application/octet-stream" />
+			<sparkle:minimumSystemVersion>15.0</sparkle:minimumSystemVersion>
 	</channel>
 </rss>
