@@ -17,8 +17,14 @@
 				</style>
 				<p>First version!</p>
 			]]></description>
-			<pubDate>Tue, 10 Nov 2026 15:30:00 -0500</pubDate>
-			<enclosure url="" sparkle:shortVersionString="1.0" sparkle:version="1" length="" type="application/octet-stream" />
+			<pubDate>Fri, 20 Nov 2026 11:55:00 -0500</pubDate>
+			<enclosure url="https://s3.amazonaws.com/micro.blog/mac/Wavelength_1.0.zip"
+				sparkle:shortVersionString="1.0"
+				sparkle:version="1"
+				sparkle:edSignature="zaNqF7nOK67GnzAAnQQJhR6VWMvVLzzrwre0zyPhXSeXabmL13vZZLEDpnnM+7gSeYTndILs9W0YJh0hqf/qAw=="
+				length="3803006"
+				type="application/octet-stream" />
 			<sparkle:minimumSystemVersion>15.0</sparkle:minimumSystemVersion>
+		</item>
 	</channel>
 </rss>
