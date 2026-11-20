@@ -27,7 +27,7 @@ enum SidebarItem: String, Hashable, CaseIterable, Identifiable {
     case .narrations: "mic"
     case .posts: "doc"
     case .discover: "magnifyingglass"
-    case .listenLater: "bookmark"
+    case .listenLater: "star"
     }
   }
 

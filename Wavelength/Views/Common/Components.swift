@@ -30,6 +30,7 @@ struct EmptyStateView: View {
   let title: String
   let message: String
   var actionTitle: String?
+  var actionTopPadding: CGFloat = 0
   var action: (() -> Void)?
 
   var body: some View {
@@ -42,6 +43,7 @@ struct EmptyStateView: View {
         Button(actionTitle, action: action)
           .buttonStyle(.borderedProminent)
           .controlSize(.large)
+          .padding(.top, actionTopPadding)
       }
     }
     .frame(maxWidth: .infinity, maxHeight: .infinity)

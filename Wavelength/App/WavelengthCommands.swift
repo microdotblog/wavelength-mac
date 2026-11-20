@@ -83,7 +83,6 @@ struct WavelengthCommands: Commands {
       ForEach(Array(SidebarItem.allCases.enumerated()), id: \.element) { index, item in
         Button(item.title) { model.showSection(item) }
           .keyboardShortcut(KeyEquivalent(Character("\(index + 1)")))
-          .disabled(item == .narrations && model.posts.narratedPosts.isEmpty)
       }
 
       Divider()

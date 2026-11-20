@@ -16,10 +16,11 @@ struct EpisodeListView: View {
     Group {
       if library.episodes.isEmpty, library.didHydrate {
         EmptyStateView(
-          symbol: "mic.circle",
+          symbol: SidebarItem.podcasts.symbol,
           title: "Record your first podcast",
           message: "Start recording, then edit it and publish it to Micro.blog.",
           actionTitle: "New Episode",
+          actionTopPadding: 10,
           action: model.startNewEpisode
         )
         .focusable(interactions: .edit)

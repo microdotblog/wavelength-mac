@@ -25,7 +25,7 @@ struct DiscoverListView: View {
               Task { await discover.refresh(feed) }
             }
           } else {
-            EmptyStateView(symbol: feed == .discover ? "sparkles" : "bookmark", title: feed.emptyTitle, message: feed.emptyBody)
+            EmptyStateView(symbol: feed == .discover ? "sparkles" : "star", title: feed.emptyTitle, message: feed.emptyBody)
           }
         }
         .focusable(interactions: .edit)
@@ -34,7 +34,7 @@ struct DiscoverListView: View {
       } else {
         List(selection: $model.selectedDiscoverID) {
           ForEach(posts) { post in
-            DiscoverRow(post: post)
+            DiscoverRow(post: post, showsSavedBadge: feed == .discover)
               .tag(post.id)
               .contextMenu { menu(for: post) }
               .onAppear {
@@ -86,7 +86,7 @@ struct DiscoverListView: View {
     }
 
     if let url = URL(string: post.url) {
-      Button("Open Post", systemImage: "safari") { openURL(url) }
+      Button("Open in Browser", systemImage: "safari") { openURL(url) }
     }
 
     if session.isSignedIn {
@@ -104,7 +104,7 @@ struct ListenLaterButton: View {
 
   var body: some View {
     if post.isSaved {
-      Button("Remove from Listen Later", systemImage: "bookmark.slash") {
+      Button("Remove from Listen Later", systemImage: "star.fill") {
         Task {
           do {
             try await discover.removeFromLater(post)
@@ -115,7 +115,7 @@ struct ListenLaterButton: View {
         }
       }
     } else {
-      Button("Listen Later", systemImage: "bookmark") {
+      Button("Listen Later", systemImage: "star") {
         Task {
           do {
             try await discover.saveForLater(post)
@@ -131,6 +131,7 @@ struct ListenLaterButton: View {
 
 struct DiscoverRow: View {
   let post: DiscoverPost
+  let showsSavedBadge: Bool
 
   @Environment(NowPlaying.self) private var nowPlaying
 
@@ -160,8 +161,8 @@ struct DiscoverRow: View {
 
       Spacer(minLength: 0)
 
-      if post.isSaved {
-        Image(systemName: "bookmark.fill")
+      if showsSavedBadge && post.isSaved {
+        Image(systemName: "star.fill")
           .foregroundStyle(.tertiary)
           .help("In Listen Later")
       }
@@ -179,7 +180,7 @@ struct DiscoverRow: View {
 }
 
 struct DiscoverDetailView: View {
-  let postID: String
+  let postID: String?
 
   @Environment(DiscoverStore.self) private var discover
   @Environment(NowPlaying.self) private var nowPlaying
@@ -187,7 +188,7 @@ struct DiscoverDetailView: View {
   @Environment(\.openURL) private var openURL
 
   var body: some View {
-    if let post = discover.post(postID) {
+    if let postID, let post = discover.post(postID) {
       ScrollView {
         VStack(alignment: .leading, spacing: 20) {
           HStack(alignment: .top, spacing: 20) {
@@ -259,7 +260,7 @@ struct DiscoverDetailView: View {
       }
       .navigationTitle(post.sourceLabel)
     } else {
-      EmptyStateView(symbol: "sparkles", title: "Pick an Episode", message: "Choose a podcast to see its details.")
+      Color.clear
     }
   }
 }

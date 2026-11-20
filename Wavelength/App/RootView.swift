@@ -19,15 +19,27 @@ struct RootView: View {
 }
 
 private struct MainView: View {
+  private let sidebarWidthRange: ClosedRange<CGFloat> = 190...280
+
   @Environment(AppModel.self) private var model
   @Environment(Library.self) private var library
+  @Environment(PostsStore.self) private var posts
   @State private var columns = NavigationSplitViewVisibility.all
+  @State private var sidebarWidth: CGFloat = 210
+
+  private var showsListInDetail: Bool {
+    switch model.sidebar {
+    case .podcasts: library.episodes.isEmpty
+    case .narrations: posts.narratedPosts.isEmpty
+    default: false
+    }
+  }
 
   var body: some View {
     @Bindable var model = model
 
     Group {
-      if model.sidebar == .podcasts && library.episodes.isEmpty {
+      if showsListInDetail {
         NavigationSplitView(columnVisibility: $columns) {
           sidebar
         } detail: {
@@ -60,8 +72,12 @@ private struct MainView: View {
 
   private var sidebar: some View {
     Sidebar()
-      .navigationSplitViewColumnWidth(min: 190, ideal: 210, max: 280)
+      .onGeometryChange(for: CGFloat.self, of: \.size.width) { oldWidth, newWidth in
+        guard oldWidth > 0, sidebarWidthRange.contains(newWidth) else { return }
+        sidebarWidth = newWidth
+      }
       .toolbar(removing: .sidebarToggle)
+      .navigationSplitViewColumnWidth(min: sidebarWidthRange.lowerBound, ideal: sidebarWidth, max: sidebarWidthRange.upperBound)
   }
 
   @ViewBuilder
@@ -82,38 +98,44 @@ private struct MainView: View {
 
   private var detail: some View {
     Group {
-      switch model.sidebar {
-      case .podcasts:
-        if library.episodes.isEmpty {
-          EpisodeListView()
-        } else if let id = model.selectedEpisodeID {
-          EpisodeEditorView(episodeID: id)
-            .id(id)
-        } else {
-          Color.clear
-            .toolbar { ToolbarSpacer(.flexible) }
-        }
-      case .narrations, .posts:
-        if let uid = model.selectedPostUID {
-          NarrateView(postUID: uid)
-            .id(uid)
-        } else {
-          EmptyStateView(
-            symbol: "mic",
-            title: "Narrate a Post",
-            message: "Pick a post to read it aloud. Wavelength attaches your narration to the post on Micro.blog."
-          )
-        }
-      case .discover, .listenLater:
-        if let id = model.selectedDiscoverID {
-          DiscoverDetailView(postID: id)
-        } else {
-          EmptyStateView(symbol: "sparkles", title: "Pick an Episode", message: "Choose a podcast to see its details. Double-click to play.")
-        }
+      if showsListInDetail {
+        content
+      } else {
+        selectedDetail
       }
     }
     .safeAreaInset(edge: .bottom, spacing: 0) {
       NowPlayingBar()
+    }
+  }
+
+  @ViewBuilder
+  private var selectedDetail: some View {
+    switch model.sidebar {
+    case .podcasts:
+      if let id = model.selectedEpisodeID {
+        EpisodeEditorView(episodeID: id)
+          .id(id)
+      } else {
+        Color.clear
+          .toolbar { ToolbarSpacer(.flexible) }
+      }
+    case .narrations, .posts:
+      if let uid = model.selectedPostUID {
+        NarrateView(postUID: uid)
+          .id(uid)
+      } else if model.sidebar == .posts {
+        EmptyStateView(
+          symbol: "mic",
+          title: "Narrate a Post",
+          message: "Pick a post to read it aloud. Wavelength attaches your narration to the post on Micro.blog."
+        )
+      } else {
+        Color.clear
+          .toolbar { ToolbarSpacer(.flexible) }
+      }
+    case .discover, .listenLater:
+      DiscoverDetailView(postID: model.selectedDiscoverID)
     }
   }
 }
@@ -127,20 +149,13 @@ private struct Sidebar: View {
   var body: some View {
     List(selection: selection) {
       row(.podcasts, badge: library.episodes.count)
-      if !posts.narratedPosts.isEmpty {
-        row(.narrations, badge: posts.narratedPosts.count)
-      }
+      row(.narrations, badge: posts.narratedPosts.count)
       row(.posts)
       row(.discover)
       row(.listenLater)
     }
     .safeAreaInset(edge: .bottom, spacing: 0) {
       accountSummary
-    }
-    .onChange(of: posts.narratedPosts.isEmpty, initial: true) { _, isEmpty in
-      if isEmpty && model.sidebar == .narrations {
-        model.showSection(.posts, focusContent: false)
-      }
     }
   }
 
