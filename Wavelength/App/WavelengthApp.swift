@@ -22,7 +22,7 @@ struct WavelengthApp: App {
     .defaultSize(width: 1200, height: 760)
     .defaultLaunchBehavior(startsSignedIn ? .presented : .suppressed)
     .commands {
-      WavelengthCommands(model: delegate.model)
+      WavelengthCommands(model: delegate.model, updates: delegate.updates)
     }
 
     Settings {
@@ -34,8 +34,11 @@ struct WavelengthApp: App {
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
   let model = AppModel()
+  let updates = SoftwareUpdates()
 
   func applicationDidFinishLaunching(_ notification: Notification) {
+    updates.start()
+
     if Keychain.load().userToken.nonEmpty == nil {
       model.showSignIn()
     }

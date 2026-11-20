@@ -25,6 +25,28 @@ Run `xcodegen generate` again after adding or removing files.
 
 The app is signed with the Micro.blog developer team (`3F9MDJ6K4E`), so you need to be a member of that team in Xcode to build it.
 
+## Sparkle updates
+
+Wavelength uses Sparkle for direct downloads. The **Check for Updates…** command is available in builds that include an HTTPS appcast URL and a Sparkle public key. Checks and installs are manual for now.
+
+The appcast URL and public key are configured in `project.yml`. The private signing key lives in Keychain under the Sparkle account `blog.micro.wavelength`.
+
+For update testing, override `WAVELENGTH_UPDATE_FEED_URL` when archiving to point at a separate HTTPS feed. Increase `CURRENT_PROJECT_VERSION` for each update.
+
+```bash
+xcodebuild -project Wavelength.xcodeproj -scheme Wavelength \
+  -configuration Release -archivePath build/Wavelength.xcarchive \
+  -clonedSourcePackagesDirPath build/SourcePackages archive
+```
+
+Export the archive using Developer ID, notarize the app, and staple the ticket. Run the release script with the app path, version, and build number. The script looks for Sparkle tools in `build/SourcePackages/artifacts/sparkle/Sparkle/bin`. Set `SPARKLE_BIN` if Xcode resolved the package elsewhere.
+
+```bash
+Scripts/release.sh /path/to/Wavelength.app 2.0 1
+```
+
+The script writes `Wavelength_2.0.zip` in the current directory and prints the signed enclosure XML. Upload the ZIP, then paste the enclosure into the release item in `wavelength.xml` and publish the appcast. Test updating from a lower build number through installation and relaunch on the test feed before publishing a production update.
+
 ## Tests
 
 ```bash

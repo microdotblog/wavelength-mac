@@ -2,6 +2,7 @@ import SwiftUI
 
 struct WavelengthCommands: Commands {
   let model: AppModel
+  let updates: SoftwareUpdates
 
   @FocusedValue(\.episodeActions) private var episode
   @FocusedValue(\.segmentActions) private var segment
@@ -10,6 +11,11 @@ struct WavelengthCommands: Commands {
 
   var body: some Commands {
     let _ = model.openMainWindow = { openWindow(id: WindowID.main) }
+
+    CommandGroup(after: .appInfo) {
+      Button("Check for Updates…", action: updates.checkForUpdates)
+        .disabled(!updates.canCheckForUpdates || model.recorder.isActive || model.sheet != nil || model.posts.isAttaching)
+    }
 
     CommandGroup(replacing: .newItem) {
       Button("New Episode") { model.startNewEpisode() }

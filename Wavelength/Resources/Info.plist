@@ -33,7 +33,19 @@
 	<string>$(CURRENT_PROJECT_VERSION)</string>
 	<key>LSApplicationCategoryType</key>
 	<string>public.app-category.productivity</string>
+	<key>LSMinimumSystemVersion</key>
+	<string>$(MACOSX_DEPLOYMENT_TARGET)</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Allow Wavelength to record podcasts.</string>
+	<key>SUAllowsAutomaticUpdates</key>
+	<false/>
+	<key>SUEnableAutomaticChecks</key>
+	<false/>
+	<key>SUEnableInstallerLauncherService</key>
+	<true/>
+	<key>SUFeedURL</key>
+	<string>$(WAVELENGTH_UPDATE_FEED_URL)</string>
+	<key>SUPublicEDKey</key>
+	<string>$(WAVELENGTH_UPDATE_PUBLIC_KEY)</string>
 </dict>
 </plist>
