@@ -2,7 +2,7 @@
 set -euo pipefail
 
 if [[ $# != 3 ]]; then
-  echo "Usage: $0 /path/to/Wavelength.app 2.0 1" >&2
+  echo "Usage: $0 /path/to/Wavelength.app 1.0 1" >&2
   exit 1
 fi
 

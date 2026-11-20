@@ -42,10 +42,10 @@ xcodebuild -project Wavelength.xcodeproj -scheme Wavelength \
 Export the archive using Developer ID, notarize the app, and staple the ticket. Run the release script with the app path, version, and build number. The script looks for Sparkle tools in `build/SourcePackages/artifacts/sparkle/Sparkle/bin`. Set `SPARKLE_BIN` if Xcode resolved the package elsewhere.
 
 ```bash
-Scripts/release.sh /path/to/Wavelength.app 2.0 1
+Scripts/release.sh /path/to/Wavelength.app 1.0 1
 ```
 
-The script writes `Wavelength_2.0.zip` in the current directory and prints the signed enclosure XML. Upload the ZIP, then paste the enclosure into the release item in `wavelength.xml` and publish the appcast. Test updating from a lower build number through installation and relaunch on the test feed before publishing a production update.
+The script writes `Wavelength_1.0.zip` in the current directory and prints the signed enclosure XML. Upload the ZIP, then paste the enclosure into the release item in `wavelength.xml` and publish the appcast. Test updating from a lower build number through installation and relaunch on the test feed before publishing a production update.
 
 ## Tests
 
