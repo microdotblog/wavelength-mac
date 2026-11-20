@@ -127,17 +127,9 @@ struct EpisodeRow: View {
         .background(.quaternary, in: .rect(cornerRadius: 8))
 
       VStack(alignment: .leading, spacing: 3) {
-        HStack(spacing: 6) {
-          Text(episode.title)
-            .font(.body.weight(.semibold))
-            .lineLimit(1)
-
-          if episode.isPublished {
-            Image(systemName: "checkmark.seal.fill")
-              .foregroundStyle(Color.accentColor)
-              .help("Published")
-          }
-        }
+        Text(episode.title)
+          .font(.body.weight(.semibold))
+          .lineLimit(1)
 
         Text(subtitle)
           .font(.caption.monospacedDigit())
@@ -149,6 +141,13 @@ struct EpisodeRow: View {
 
       if library.isWorking(episode.id) {
         ProgressView().controlSize(.small)
+      }
+
+      if episode.isPublished {
+        Image(systemName: "checkmark.circle.fill")
+          .symbolRenderingMode(.palette)
+          .foregroundStyle(Color(hex: 0x22662D), Color(hex: 0xD8F4D7))
+          .help("Published")
       }
     }
     .frame(height: Self.height - 8)

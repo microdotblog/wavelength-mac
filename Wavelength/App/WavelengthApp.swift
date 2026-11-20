@@ -37,6 +37,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
   let updates = SoftwareUpdates()
 
   func applicationDidFinishLaunching(_ notification: Notification) {
+    if !UserDefaults.standard.bool(forKey: "ShowMenuIcons") {
+      NSMenuItem.disableMenuIcons()
+    }
+
     updates.start()
 
     if Keychain.load().userToken.nonEmpty == nil {

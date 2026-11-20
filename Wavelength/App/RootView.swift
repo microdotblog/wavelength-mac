@@ -174,22 +174,27 @@ private struct Sidebar: View {
   }
 
   private var accountSummary: some View {
-    HStack(spacing: 8) {
-      AvatarView(url: session.profile?.photo, size: 26)
-      VStack(alignment: .leading, spacing: 0) {
-        Text(session.displayName)
-          .font(.callout.weight(.semibold))
-          .lineLimit(1)
-        if let username = session.profile?.username {
-          Text("@\(username)")
-            .font(.caption)
-            .foregroundStyle(.secondary)
+    SettingsLink {
+      HStack(spacing: 8) {
+        AvatarView(url: session.profile?.photo, size: 26)
+        VStack(alignment: .leading, spacing: 0) {
+          Text(session.displayName)
+            .font(.callout.weight(.semibold))
             .lineLimit(1)
+          if let username = session.profile?.username {
+            Text("@\(username)")
+              .font(.caption)
+              .foregroundStyle(.secondary)
+              .lineLimit(1)
+          }
         }
+        Spacer(minLength: 0)
       }
-      Spacer(minLength: 0)
+      .accessibilityElement(children: .combine)
+      .padding(10)
+      .contentShape(Rectangle())
     }
-    .accessibilityElement(children: .combine)
-    .padding(10)
+    .buttonStyle(.plain)
+    .help("Open Settings")
   }
 }

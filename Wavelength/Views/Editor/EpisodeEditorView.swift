@@ -95,15 +95,7 @@ struct EpisodeEditorView: View {
     ToolbarSpacer(.flexible)
 
     ToolbarItemGroup {
-      if episode.isPublished {
-        if let uid = episode.postID {
-          Button {
-            model.sheet = .editPost(postUID: uid)
-          } label: {
-            Label("Edit Post", systemImage: "square.and.pencil")
-          }
-        }
-      } else {
+      if !episode.isPublished {
         Button {
           model.sheet = .publish(episodeID: episode.id)
         } label: {
