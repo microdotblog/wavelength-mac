@@ -5,7 +5,7 @@ import PackageDescription
 // Uses the same MIT-licensed Markdown renderer as Micro.blog for Mac.
 let package = Package(
   name: "MMMarkdown",
-  platforms: [.macOS(.v26)],
+  platforms: [.macOS(.v15)],
   products: [
     .library(name: "MMMarkdown", targets: ["MMMarkdown"]),
   ],

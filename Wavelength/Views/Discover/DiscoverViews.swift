@@ -351,7 +351,7 @@ struct NowPlayingBar: View {
       .font(.title3)
       .padding(.horizontal, 16)
       .padding(.vertical, 10)
-      .glassEffect(.regular, in: .rect(cornerRadius: 18))
+      .glassBackground(in: .rect(cornerRadius: 18))
       .padding(12)
     }
   }

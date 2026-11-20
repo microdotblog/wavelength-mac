@@ -26,7 +26,7 @@ struct NarrateView: View {
           .background(.bar)
       }
       .navigationTitle(post.displayTitle)
-      .toolbar { ToolbarSpacer(.flexible) }
+      .toolbar { FlexibleToolbarSpacer() }
       .task(id: playbackURL) {
         await player.load(playbackURL.map { [$0] } ?? [])
       }

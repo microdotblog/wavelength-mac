@@ -4,6 +4,34 @@ extension View {
   func contentListFocus() -> some View {
     modifier(ContentListFocus())
   }
+
+  @ViewBuilder
+  func glassBackground(in shape: some Shape, tint: Color? = nil) -> some View {
+    if #available(macOS 26.0, *) {
+      glassEffect(.regular.tint(tint), in: shape)
+    } else {
+      background {
+        shape.fill(.regularMaterial)
+          .overlay {
+            if let tint {
+              shape.fill(tint)
+            }
+          }
+      }
+    }
+  }
+}
+
+struct FlexibleToolbarSpacer: ToolbarContent {
+  var body: some ToolbarContent {
+    if #available(macOS 26.0, *) {
+      ToolbarSpacer(.flexible)
+    } else {
+      ToolbarItem {
+        Spacer(minLength: 0)
+      }
+    }
+  }
 }
 
 private struct ContentListFocus: ViewModifier {
@@ -146,7 +174,7 @@ struct ToastOverlay: View {
           .font(.callout.weight(.medium))
           .padding(.horizontal, 16)
           .padding(.vertical, 10)
-          .glassEffect(.regular, in: .capsule)
+          .glassBackground(in: .capsule)
           .padding(.bottom, 24)
           .transition(.move(edge: .bottom).combined(with: .opacity))
           .id(toast.id)

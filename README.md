@@ -8,7 +8,7 @@ It mirrors the Expo app in `../wavelength-react`: the same Micro.blog API calls,
 
 ## Requirements
 
-- macOS 26 or later
+- macOS 15 or later
 - Xcode 26 or later
 - [XcodeGen](https://github.com/yonaskolb/XcodeGen) (`brew install xcodegen`)
 

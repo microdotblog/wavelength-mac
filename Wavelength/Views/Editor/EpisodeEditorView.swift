@@ -92,7 +92,7 @@ struct EpisodeEditorView: View {
 
   @ToolbarContentBuilder
   private func toolbar(_ episode: Episode) -> some ToolbarContent {
-    ToolbarSpacer(.flexible)
+    FlexibleToolbarSpacer()
 
     ToolbarItemGroup {
       if !episode.isPublished {

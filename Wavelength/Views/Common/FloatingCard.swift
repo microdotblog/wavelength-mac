@@ -24,6 +24,6 @@ extension View {
           .allowsWindowActivationEvents(true)
       }
       .clipShape(.rect(cornerRadius: 30))
-      .glassEffect(.regular, in: .rect(cornerRadius: 30))
+      .glassBackground(in: .rect(cornerRadius: 30))
   }
 }

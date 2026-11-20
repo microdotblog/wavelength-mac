@@ -2,14 +2,14 @@ name: Wavelength
 options:
   bundleIdPrefix: blog.micro
   deploymentTarget:
-    macOS: "26.0"
+    macOS: "15.0"
   createIntermediateGroups: true
 settings:
   base:
     SWIFT_VERSION: "6.0"
     SWIFT_DEFAULT_ACTOR_ISOLATION: MainActor
     SWIFT_APPROACHABLE_CONCURRENCY: YES
-    MACOSX_DEPLOYMENT_TARGET: "26.0"
+    MACOSX_DEPLOYMENT_TARGET: "15.0"
     DEVELOPMENT_TEAM: 3F9MDJ6K4E
     CODE_SIGN_STYLE: Automatic
     CODE_SIGN_IDENTITY: Apple Development

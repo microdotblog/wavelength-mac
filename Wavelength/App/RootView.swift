@@ -118,7 +118,7 @@ private struct MainView: View {
           .id(id)
       } else {
         Color.clear
-          .toolbar { ToolbarSpacer(.flexible) }
+          .toolbar { FlexibleToolbarSpacer() }
       }
     case .narrations, .posts:
       if let uid = model.selectedPostUID {
@@ -132,7 +132,7 @@ private struct MainView: View {
         )
       } else {
         Color.clear
-          .toolbar { ToolbarSpacer(.flexible) }
+          .toolbar { FlexibleToolbarSpacer() }
       }
     case .discover, .listenLater:
       DiscoverDetailView(postID: model.selectedDiscoverID)

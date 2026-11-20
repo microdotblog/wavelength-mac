@@ -54,6 +54,20 @@ struct SignInView: View {
   }
 
   private var header: some View {
+    Group {
+      if #available(macOS 26.0, *) {
+        headerControls.buttonStyle(.glass)
+      } else {
+        headerControls.buttonStyle(.bordered)
+      }
+    }
+    .buttonBorderShape(.circle)
+    .controlSize(.large)
+    .focusEffectDisabled()
+    .disabled(session.isBusy)
+  }
+
+  private var headerControls: some View {
     HStack {
       if mode == .token {
         Button(action: showWelcome) {
@@ -85,11 +99,6 @@ struct SignInView: View {
       .help("More sign-in options")
       .hidden()
     }
-    .buttonStyle(.glass)
-    .buttonBorderShape(.circle)
-    .controlSize(.large)
-    .focusEffectDisabled()
-    .disabled(session.isBusy)
   }
 
   private var welcome: some View {
@@ -160,7 +169,7 @@ struct SignInView: View {
         .font(.system(size: 30, weight: .semibold))
         .foregroundStyle(Color.accentColor)
         .frame(width: 72, height: 72)
-        .glassEffect(.regular.tint(Color.accentColor.opacity(0.15)), in: .circle)
+        .glassBackground(in: .circle, tint: Color.accentColor.opacity(0.15))
         .padding(.bottom, 20)
 
       Text("Sign in with a token")
@@ -182,7 +191,7 @@ struct SignInView: View {
         .onSubmit(signInWithToken)
         .padding(.horizontal, 16)
         .padding(.vertical, 12)
-        .glassEffect(.regular, in: .capsule)
+        .glassBackground(in: .capsule)
 
       Button("Find your app tokens on Micro.blog") {
         openURL(URL(string: "https://micro.blog/account/apps")!)
