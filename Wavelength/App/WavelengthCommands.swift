@@ -9,7 +9,6 @@ struct WavelengthCommands: Commands {
   @Environment(\.openWindow) private var openWindow
 
   var body: some Commands {
-    @Bindable var posts = model.posts
     let _ = model.openMainWindow = { openWindow(id: WindowID.main) }
 
     CommandGroup(replacing: .newItem) {
@@ -63,7 +62,14 @@ struct WavelengthCommands: Commands {
         .disabled(episode == nil)
     }
 
-    CommandGroup(before: .toolbar) {
+    CommandGroup(before: .sidebar) {
+      ForEach(Array(SidebarItem.allCases.enumerated()), id: \.element) { index, item in
+        Button(item.title) { model.showSection(item) }
+          .keyboardShortcut(KeyEquivalent(Character("\(index + 1)")))
+      }
+
+      Divider()
+
       Button("Zoom In") { segment?.zoomIn?() }
         .keyboardShortcut("+")
         .disabled(segment?.zoomIn == nil)
@@ -77,24 +83,14 @@ struct WavelengthCommands: Commands {
         .disabled(segment?.zoomToFit == nil)
 
       Divider()
-    }
 
-    CommandGroup(before: .sidebar) {
-      ForEach(Array(SidebarItem.allCases.enumerated()), id: \.element) { index, item in
-        Button(item.title) { model.showSection(item) }
-          .keyboardShortcut(KeyEquivalent(Character("\(index + 1)")))
+      ForEach(PostsStore.Filter.allCases) { filter in
+        Toggle(filter.label, isOn: Binding(
+          get: { model.posts.filter == filter },
+          set: { _ in model.posts.filter = filter }
+        ))
+        .disabled(model.sidebar != .posts)
       }
-
-      Divider()
-
-      Picker("Filter Posts", selection: $posts.filter) {
-        ForEach(PostsStore.Filter.allCases) { filter in
-          Text(filter.label).tag(filter)
-        }
-      }
-      .pickerStyle(.inline)
-      .labelsHidden()
-      .disabled(model.sidebar != .posts)
 
       Divider()
     }
