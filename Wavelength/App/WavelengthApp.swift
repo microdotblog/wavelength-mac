@@ -71,23 +71,39 @@ extension View {
 private struct MainWindowRouting: ViewModifier {
   @Environment(AppModel.self) private var model
   @Environment(Session.self) private var session
-  @Environment(\.dismissWindow) private var dismissWindow
 
   func body(content: Content) -> some View {
     content
-      .task {
-        await model.start()
-        route()
+      .background {
+        MainWindowReader(model: model)
+          .frame(width: 0, height: 0)
       }
-      .onChange(of: session.isSignedIn) {
-        route()
+      .task { await model.start() }
+      .onChange(of: session.isHydrated && !session.isSignedIn, initial: true) { _, needsSignIn in
+        if needsSignIn {
+          model.showSignIn()
+        }
       }
   }
+}
 
-  private func route() {
-    guard session.isHydrated, !session.isSignedIn else { return }
+private struct MainWindowReader: NSViewRepresentable {
+  let model: AppModel
 
-    model.showSignIn()
-    dismissWindow(id: WindowID.main)
+  func makeNSView(context: Context) -> WindowReaderView {
+    let view = WindowReaderView()
+    view.model = model
+    return view
+  }
+
+  func updateNSView(_ nsView: WindowReaderView, context: Context) {}
+
+  final class WindowReaderView: NSView {
+    weak var model: AppModel?
+
+    override func viewDidMoveToWindow() {
+      super.viewDidMoveToWindow()
+      model?.mainWindow = window
+    }
   }
 }

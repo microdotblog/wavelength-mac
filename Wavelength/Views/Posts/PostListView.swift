@@ -11,7 +11,6 @@ struct PostListView: View {
   @Environment(AppModel.self) private var model
   @Environment(PostsStore.self) private var posts
   @Environment(Session.self) private var session
-  @Environment(\.openURL) private var openURL
   @State private var pendingDelete: Post?
 
   private var visiblePosts: [Post] {
@@ -51,26 +50,20 @@ struct PostListView: View {
       }
   }
 
-  @ViewBuilder
   private var column: some View {
-    switch source {
-    case .all:
-      postList
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .safeAreaInset(edge: .top, spacing: 0) {
-          if posts.filter != .all {
-            filterBar
-          }
+    let title: LocalizedStringKey = source == .all ? "Posts" : "Narrations"
+
+    return postList
+      .frame(maxWidth: .infinity, maxHeight: .infinity)
+      .safeAreaInset(edge: .top, spacing: 0) {
+        if source == .all && posts.filter != .all {
+          filterBar
         }
-        .safeAreaInset(edge: .bottom, spacing: 0) {
-          postsFooter
-        }
-        .navigationTitle("Posts")
-    case .narrations:
-      postList
-        .navigationTitle("Narrations")
-        .navigationSubtitle(session.destinationName)
-    }
+      }
+      .safeAreaInset(edge: .bottom, spacing: 0) {
+        blogFooter
+      }
+      .navigationTitle(title)
   }
 
   @ViewBuilder
@@ -113,7 +106,7 @@ struct PostListView: View {
     }
   }
 
-  private var postsFooter: some View {
+  private var blogFooter: some View {
     VStack(spacing: 0) {
       Divider()
 
@@ -194,7 +187,7 @@ struct PostListView: View {
   @ViewBuilder
   private func menu(for post: Post) -> some View {
     if let url = URL(string: post.url) {
-      Button("Open in Browser", systemImage: "safari") { openURL(url) }
+      OpenInBrowserButton(url: url)
       Button("Copy Link", systemImage: "link") {
         NSPasteboard.general.clearContents()
         NSPasteboard.general.setString(url.absoluteString, forType: .string)

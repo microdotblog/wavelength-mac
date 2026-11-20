@@ -50,6 +50,34 @@ struct EmptyStateView: View {
   }
 }
 
+struct OpenInBrowserButton: View {
+  let url: URL
+
+  @Environment(\.openURL) private var openURL
+  @Environment(\.scenePhase) private var scenePhase
+  @State private var title = OpenInBrowserButton.defaultTitle()
+
+  var body: some View {
+    Button(title, systemImage: "safari") { openURL(url) }
+      .onChange(of: scenePhase) { _, phase in
+        if phase == .active {
+          title = Self.defaultTitle()
+        }
+      }
+  }
+
+  private static func defaultTitle() -> String {
+    let webURL = URL(string: "https://micro.blog/")!
+    guard let appURL = NSWorkspace.shared.urlForApplication(toOpen: webURL) else {
+      return "Open in Browser"
+    }
+
+    let displayName = Bundle(url: appURL)?.object(forInfoDictionaryKey: "CFBundleDisplayName") as? String
+    let name = displayName.nonEmpty ?? appURL.deletingPathExtension().lastPathComponent
+    return "Open in \(name == "Google Chrome" ? "Chrome" : name)"
+  }
+}
+
 struct AvatarView: View {
   let url: URL?
   var size: CGFloat = 32

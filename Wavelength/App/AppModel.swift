@@ -76,6 +76,7 @@ final class AppModel {
   var sheet: Sheet?
   var pendingNarrationTakes: [String: RecordedTake] = [:]
   @ObservationIgnored private var didStart = false
+  @ObservationIgnored weak var mainWindow: NSWindow?
   @ObservationIgnored var openMainWindow: () -> Void = {}
 
   init() {
@@ -103,6 +104,7 @@ final class AppModel {
   }
 
   func showSignIn() {
+    mainWindow?.orderOut(nil)
     signInCard.show(title: "Sign In") {
       SignInView().appEnvironment(self)
     }

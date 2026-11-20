@@ -124,7 +124,7 @@ struct AuthTests {
     let items = try #require(URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems)
     let values = Dictionary(uniqueKeysWithValues: items.map { ($0.name, $0.value ?? "") })
 
-    #expect(values["client_id"] == "https://micro.blog/wavelength/")
+    #expect(values["client_id"] == "https://wavelength.micro.blog/client.json")
     #expect(values["redirect_uri"] == "wavelength://auth/callback")
     #expect(values["scope"] == "read write")
     #expect(values["state"] == "abc")

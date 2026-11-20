@@ -4,7 +4,7 @@ nonisolated enum MicroBlogAuth {
   static let authURL = URL(string: "https://micro.blog/indieauth/auth")!
   static let tokenURL = URL(string: "https://micro.blog/indieauth/token")!
   static let verifyURL = URL(string: "https://micro.blog/account/verify")!
-  static let clientID = "https://micro.blog/wavelength/"
+  static let clientID = "https://wavelength.micro.blog/client.json"
   static let scope = "read write"
   static let scheme = "wavelength"
   static let redirectURI = "wavelength://auth/callback"

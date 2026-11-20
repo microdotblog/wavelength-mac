@@ -1,0 +1,7 @@
+{
+	"client_id": "https://wavelength.micro.blog/client.json",
+	"client_name": "Wavelength",
+	"client_uri": "https://wavelength.micro.blog/",
+	"logo_uri": "https://micro.blog/images/icons/suite/wavelength.png",
+	"redirect_uris": [ "wavelength://auth/callback" ]
+}

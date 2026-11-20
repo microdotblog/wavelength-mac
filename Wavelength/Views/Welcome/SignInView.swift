@@ -83,6 +83,7 @@ struct SignInView: View {
       }
       .menuIndicator(.hidden)
       .help("More sign-in options")
+      .hidden()
     }
     .buttonStyle(.glass)
     .buttonBorderShape(.circle)
@@ -129,7 +130,7 @@ struct SignInView: View {
       Button(action: signInWithMicroBlog) {
         HStack(spacing: 8) {
           if session.phase == .connecting {
-            ProgressView().controlSize(.small).tint(.white)
+            ProgressView().controlSize(.small)
           } else {
             Image("MicroBlogLogo")
               .resizable()
@@ -137,10 +138,10 @@ struct SignInView: View {
           }
           Text(session.phase == .connecting ? "Waiting for Micro.blog…" : "Sign in with Micro.blog")
         }
-        .font(.title3.weight(.semibold))
-        .frame(maxWidth: .infinity)
       }
-      .buttonStyle(PrimaryCapsuleButtonStyle())
+      .buttonStyle(.bordered)
+      .controlSize(.large)
+      .tint(.gray)
       .keyboardShortcut(.defaultAction)
       .disabled(session.isBusy)
       .offset(y: isButtonShown || reduceMotion ? 0 : 36)
@@ -276,9 +277,6 @@ private struct PrimaryCapsuleButton: View {
   let configuration: ButtonStyleConfiguration
 
   @Environment(\.isEnabled) private var isEnabled
-  @State private var isHovered = false
-
-  private var isLifted: Bool { isHovered && isEnabled && !configuration.isPressed }
 
   var body: some View {
     configuration.label
@@ -293,21 +291,14 @@ private struct PrimaryCapsuleButton: View {
             endPoint: .bottom
           ))
           .overlay {
-            Capsule().strokeBorder(.white.opacity(isLifted ? 0.4 : 0.25), lineWidth: 1)
+            Capsule().strokeBorder(.white.opacity(0.25), lineWidth: 1)
           }
-          .shadow(
-            color: Color.accentColor.opacity(isEnabled ? (isLifted ? 0.6 : 0.45) : 0),
-            radius: isLifted ? 20 : 14,
-            y: isLifted ? 8 : 6
-          )
       }
       .opacity(isEnabled ? 1 : 0.55)
-      .scaleEffect(configuration.isPressed ? 0.97 : (isLifted ? 1.03 : 1))
-      .brightness(configuration.isPressed ? -0.05 : (isLifted ? 0.04 : 0))
-      .animation(.spring(duration: 0.25, bounce: 0.3), value: isLifted)
+      .scaleEffect(configuration.isPressed ? 0.97 : 1)
+      .brightness(configuration.isPressed ? -0.05 : 0)
       .animation(.spring(duration: 0.2), value: configuration.isPressed)
       .contentShape(.capsule)
-      .onHover { isHovered = $0 }
   }
 }
 

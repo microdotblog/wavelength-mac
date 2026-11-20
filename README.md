@@ -1,6 +1,6 @@
 # Wavelength for Mac
 
-Wavelength is a native macOS podcast studio for Micro.blog. Record, edit, and publish microcasts, narrate your posts, and listen to podcasts from Discover.
+[Wavelength](https://wavelength.micro.blog/) is a native macOS podcast studio for Micro.blog. Record, edit, and publish microcasts, narrate your posts, and listen to podcasts from Discover.
 
 It mirrors the Expo app in `../wavelength-react`: the same Micro.blog API calls, the same `episode.json` and `segment-N.m4a` episode layout, and the same 128 kbps mono MP3 on publish.
 

@@ -8,7 +8,6 @@ struct DiscoverListView: View {
   @Environment(NowPlaying.self) private var nowPlaying
   @Environment(Session.self) private var session
   @Environment(Toasts.self) private var toasts
-  @Environment(\.openURL) private var openURL
 
   var body: some View {
     @Bindable var model = model
@@ -86,7 +85,7 @@ struct DiscoverListView: View {
     }
 
     if let url = URL(string: post.url) {
-      Button("Open in Browser", systemImage: "safari") { openURL(url) }
+      OpenInBrowserButton(url: url)
     }
 
     if session.isSignedIn {
@@ -239,7 +238,7 @@ struct DiscoverDetailView: View {
                 }
 
                 if let url = URL(string: post.url) {
-                  Button("Open Post", systemImage: "safari") { openURL(url) }
+                  OpenInBrowserButton(url: url)
                     .controlSize(.large)
                 }
               }
