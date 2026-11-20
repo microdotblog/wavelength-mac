@@ -429,17 +429,15 @@ struct SegmentTimeline<Menu: View>: View {
       bottomTrailingRadius: trailing,
       topTrailingRadius: trailing
     )
-    let span = max(window.upperBound - window.lowerBound, 0.0001)
-    let progress = (layout.localProgress(of: index, at: player.currentTime) - window.lowerBound) / span
 
     return shape
       .fill(isSelected ? Color.accentColor.opacity(0.14) : Color.primary.opacity(0.04))
       .overlay {
         WaveformView(
           levels: Waveform.slice(levels, from: window.lowerBound, to: window.upperBound),
-          progress: min(max(progress, 0), 1),
           barWidth: 2,
           spacing: 1,
+          unplayed: isSelected ? .accentColor : Color(nsColor: .tertiaryLabelColor),
           gain: gain
         )
         .padding(.top, stripHeight + 4)
@@ -662,10 +660,5 @@ struct TimelineLayout {
     let index = starts.lastIndex { $0 <= x } ?? 0
     let local = widths[index] > 0 ? min(max((x - starts[index]) / widths[index], 0), 1) : 0
     return times[index] + durations[index] * Double(local)
-  }
-
-  func localProgress(of index: Int, at time: Double) -> Double {
-    guard durations.indices.contains(index), durations[index] > 0 else { return 0 }
-    return min(max((time - times[index]) / durations[index], 0), 1)
   }
 }
