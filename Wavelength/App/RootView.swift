@@ -91,6 +91,7 @@ private struct MainView: View {
             .id(id)
         } else {
           Color.clear
+            .toolbar { ToolbarSpacer(.flexible) }
         }
       case .narrations, .posts:
         if let uid = model.selectedPostUID {

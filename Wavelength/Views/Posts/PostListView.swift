@@ -193,9 +193,6 @@ struct PostListView: View {
 
   @ViewBuilder
   private func menu(for post: Post) -> some View {
-    Button("Narrate", systemImage: "mic") { model.select(post: post.uid, in: source == .all ? .posts : .narrations) }
-    Button("Edit Post…", systemImage: "square.and.pencil") { model.sheet = .editPost(postUID: post.uid) }
-
     if let url = URL(string: post.url) {
       Button("Open in Browser", systemImage: "safari") { openURL(url) }
       Button("Copy Link", systemImage: "link") {
@@ -209,9 +206,6 @@ struct PostListView: View {
         Task { await model.removeNarration(from: post.uid) }
       }
     }
-
-    Divider()
-    Button("Delete Post…", systemImage: "trash", role: .destructive) { pendingDelete = post }
   }
 }
 

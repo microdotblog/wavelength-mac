@@ -18,14 +18,18 @@ struct RecordingPanel<Accessory: View>: View {
   @Environment(Recorder.self) private var recorder
   @Environment(AppModel.self) private var model
   @Environment(Toasts.self) private var toasts
+  @Environment(\.accessibilityReduceMotion) private var reduceMotion
   @State private var owner = UUID()
   @State private var isConfirmingCancel = false
   @State private var isSaving = false
   @State private var isPresent = false
   @State private var notice: String?
-  @State private var isStartingFromCard = false
+  @State private var isStarting: Bool
+  @State private var recordButtonFrame = CGRect.zero
+  @State private var hasSettled = false
 
   private var isMine: Bool { recorder.isOwned(by: owner) }
+  private var canAnimateCard: Bool { hasSettled && !isStarting && !reduceMotion }
 
   init(
     idleTitle: String = "Record",
@@ -43,6 +47,7 @@ struct RecordingPanel<Accessory: View>: View {
     self.onFinish = onFinish
     self.onCancel = onCancel
     self.accessory = accessory()
+    _isStarting = State(initialValue: autoStart)
   }
 
   var body: some View {
@@ -64,11 +69,14 @@ struct RecordingPanel<Accessory: View>: View {
     .task {
       if autoStart, !recorder.isActive {
         await start()
+      } else {
+        isStarting = false
       }
     }
     .onAppear { isPresent = true }
     .onDisappear {
       isPresent = false
+      hasSettled = false
 
       if isMine {
         finish()
@@ -143,14 +151,14 @@ struct RecordingPanel<Accessory: View>: View {
   }
 
   private var canStart: Bool {
-    !recorder.isActive && !isSaving
+    !recorder.isActive && !isSaving && !isStarting
   }
 
   private func card(_ title: String?) -> some View {
     VStack(spacing: 0) {
       VStack(alignment: .leading, spacing: 6) {
         HStack(spacing: 8) {
-          RecordingDot(isPaused: !isMine || recorder.phase == .paused)
+          RecordingDot(isPaused: !isMine || recorder.phase == .paused, animationsEnabled: canAnimateCard)
           Text(cardStatus)
             .font(.caption.weight(.heavy))
             .tracking(2)
@@ -195,25 +203,30 @@ struct RecordingPanel<Accessory: View>: View {
         if isMine {
           recorder.togglePause()
         } else {
-          isStartingFromCard = true
+          isStarting = true
 
           Task {
             await start()
-            isStartingFromCard = false
           }
         }
       } label: {
-        RecordButtonFace(phase: cardFacePhase, level: isMine ? recorder.level : 0)
+        RecordButtonFace(phase: cardFacePhase, level: isMine ? recorder.level : 0, animationsEnabled: canAnimateCard)
       }
       .buttonStyle(.plain)
       .keyboardShortcut(.space, modifiers: [])
-      .disabled(isSaving || (recorder.isActive && !isMine))
+      .disabled(isStarting || isSaving || (recorder.isActive && !isMine))
       .help(isMine ? (recorder.phase == .paused ? "Resume (Space)" : "Pause (Space)") : "Start recording (Space)")
+      .onGeometryChange(for: CGRect.self) { geometry in
+        geometry.frame(in: .global)
+      } action: { frame in
+        hasSettled = false
+        recordButtonFrame = frame
+      }
 
       HStack(spacing: 12) {
-        if title == nil || !isMine {
+        if title == nil {
           InputDeviceMenu()
-            .disabled(recorder.isActive || isSaving)
+            .disabled(isStarting || recorder.isActive || isSaving)
         }
 
         Spacer()
@@ -243,6 +256,24 @@ struct RecordingPanel<Accessory: View>: View {
       .padding(.horizontal, 24)
       .padding(.vertical, 20)
     }
+    .transaction { transaction in
+      if !canAnimateCard {
+        transaction.animation = nil
+        transaction.disablesAnimations = true
+      }
+    }
+    .task(id: isStarting ? CGRect.zero : recordButtonFrame) {
+      hasSettled = false
+      guard !isStarting, !recordButtonFrame.isEmpty else { return }
+
+      // Wait for microphone startup and a stable sheet layout before animating.
+      do {
+        try await Task.sleep(for: .milliseconds(500))
+      } catch {
+        return
+      }
+      hasSettled = true
+    }
     .task(id: notice) {
       guard notice != nil else { return }
       try? await Task.sleep(for: .seconds(4))
@@ -253,7 +284,7 @@ struct RecordingPanel<Accessory: View>: View {
   private var cardFacePhase: Recorder.Phase {
     if isMine {
       recorder.phase
-    } else if isStartingFromCard {
+    } else if isStarting {
       .recording
     } else {
       .idle
@@ -261,7 +292,9 @@ struct RecordingPanel<Accessory: View>: View {
   }
 
   private var cardStatus: String {
-    switch isMine ? recorder.phase : .idle {
+    if isStarting { return "STARTING" }
+
+    return switch isMine ? recorder.phase : .idle {
     case .idle: "READY"
     case .recording: "RECORDING"
     case .paused: "PAUSED"
@@ -269,7 +302,9 @@ struct RecordingPanel<Accessory: View>: View {
   }
 
   private var cardHint: String {
-    switch isMine ? recorder.phase : .idle {
+    if isStarting { return "" }
+
+    return switch isMine ? recorder.phase : .idle {
     case .idle: "Space to start recording"
     case .recording: "Space to pause"
     case .paused: "Space to resume"
@@ -303,6 +338,8 @@ struct RecordingPanel<Accessory: View>: View {
       return
     }
 
+    isStarting = true
+    defer { isStarting = false }
     notice = nil
     let didStart = await recorder.start(owner: owner)
 
@@ -357,13 +394,12 @@ struct RecordingPanel<Accessory: View>: View {
 struct RecordButtonFace: View {
   let phase: Recorder.Phase
   let level: Float
+  let animationsEnabled: Bool
 
   @Environment(\.colorScheme) private var colorScheme
   @Environment(\.accessibilityReduceMotion) private var reduceMotion
-  @State private var layoutFrame = CGRect.zero
-  @State private var hasSettled = false
 
-  private var canAnimate: Bool { hasSettled && !reduceMotion }
+  private var canAnimate: Bool { animationsEnabled && !reduceMotion }
 
   var body: some View {
     ZStack {
@@ -397,24 +433,6 @@ struct RecordButtonFace: View {
         transaction.disablesAnimations = true
       }
     }
-    .onGeometryChange(for: CGRect.self) { geometry in
-      geometry.frame(in: .global)
-    } action: { frame in
-      hasSettled = false
-      layoutFrame = frame
-    }
-    .task(id: layoutFrame) {
-      guard !layoutFrame.isEmpty else { return }
-
-      // Let the sheet appear and restart the wait whenever layout moves the button.
-      do {
-        try await Task.sleep(for: .milliseconds(500))
-      } catch {
-        return
-      }
-      hasSettled = true
-    }
-    .onDisappear { hasSettled = false }
   }
 
   private var icon: some View {
@@ -489,12 +507,13 @@ nonisolated private struct RecordGlyph: Shape {
 
 struct RecordingDot: View {
   let isPaused: Bool
+  var animationsEnabled = true
 
   var body: some View {
     Circle()
       .fill(isPaused ? Color.secondary : Color.accentColor)
       .frame(width: 10, height: 10)
-      .phaseAnimator([1.0, 0.35]) { dot, opacity in
+      .phaseAnimator(animationsEnabled ? [1.0, 0.35] : [1.0]) { dot, opacity in
         dot.opacity(isPaused ? 1 : opacity)
       } animation: { _ in
         .easeInOut(duration: 0.8)
