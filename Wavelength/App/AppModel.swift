@@ -40,13 +40,15 @@ enum SidebarItem: String, Hashable, CaseIterable, Identifiable {
   }
 }
 
-enum Sheet: Identifiable, Equatable {
+enum Sheet: Identifiable {
+  case recording(title: String?, autoStart: Bool, onFinish: (RecordedTake) async throws -> Void)
   case publish(episodeID: String)
   case editPost(postUID: String)
   case editNarration(postUID: String, source: URL)
 
   var id: String {
     switch self {
+    case .recording: "recording"
     case .publish(let id): "publish-\(id)"
     case .editPost(let uid): "edit-\(uid)"
     case .editNarration(let uid, _): "narration-\(uid)"
@@ -65,7 +67,6 @@ final class AppModel {
   let narration = NarrationDraft()
   let toasts = Toasts()
   let signInCard = CardWindowController()
-  let recordingCard = CardWindowController()
 
   private(set) var sidebar: SidebarItem = .podcasts
   private(set) var contentFocusRequest: UUID?
@@ -76,7 +77,6 @@ final class AppModel {
   var pendingNarrationTakes: [String: RecordedTake] = [:]
   @ObservationIgnored private var didStart = false
   @ObservationIgnored var openMainWindow: () -> Void = {}
-  @ObservationIgnored private weak var focusedWindow: NSWindow?
 
   init() {
     posts = PostsStore(session: session)
@@ -108,46 +108,11 @@ final class AppModel {
     }
   }
 
-  func presentRecordingCard(title: String, autoStart: Bool, onFinish: @escaping (RecordedTake) async throws -> Void) {
-    guard !recordingCard.isVisible else { return }
+  func presentRecording(title: String?, autoStart: Bool, onFinish: @escaping (RecordedTake) async throws -> Void) {
+    guard sheet == nil, !recorder.isActive else { return }
 
-    let window = NSApp.keyWindow
-    focusedWindow = window
-    recordingCard.show(title: "Recording", centeredOn: window?.frame) {
-      RecordingCardView(title: title, autoStart: autoStart, onFinish: onFinish).appEnvironment(self)
-    }
-
-    guard let window else { return }
-
-    NSAnimationContext.runAnimationGroup { context in
-      context.duration = 0.25
-      window.animator().alphaValue = 0
-    }
-
-    Task {
-      try? await Task.sleep(for: .seconds(0.25))
-
-      if focusedWindow === window {
-        window.orderOut(nil)
-      }
-
-      window.alphaValue = focusedWindow === window ? 0 : 1
-    }
-  }
-
-  func endRecordingFocus() {
-    recordingCard.close()
-
-    guard let window = focusedWindow else { return }
-
-    focusedWindow = nil
-    window.alphaValue = 0
-    window.makeKeyAndOrderFront(nil)
-
-    NSAnimationContext.runAnimationGroup { context in
-      context.duration = 0.3
-      window.animator().alphaValue = 1
-    }
+    openMainWindow()
+    sheet = .recording(title: title, autoStart: autoStart, onFinish: onFinish)
   }
 
   func didSignIn() async {
@@ -183,12 +148,11 @@ final class AppModel {
     selectedPostUID = nil
     selectedDiscoverID = nil
     sheet = nil
-    endRecordingFocus()
     showSignIn()
   }
 
   func startNewEpisode() {
-    presentRecordingCard(title: "New Episode", autoStart: false) { [weak self] take in
+    presentRecording(title: nil, autoStart: false) { [weak self] take in
       try self?.createEpisode(from: take)
     }
   }

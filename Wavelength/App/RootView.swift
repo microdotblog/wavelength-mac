@@ -46,6 +46,8 @@ private struct MainView: View {
     }
     .sheet(item: $model.sheet) { sheet in
       switch sheet {
+      case .recording(let title, let autoStart, let onFinish):
+        RecordingCardView(title: title, autoStart: autoStart, onFinish: onFinish)
       case .publish(let episodeID):
         ComposeSheet(mode: .publish(episodeID: episodeID))
       case .editPost(let postUID):
