@@ -143,10 +143,6 @@ final class NarrationDraft: SegmentEditing {
       throw StorageError(message: "This narration has no audio to save.")
     }
 
-    if Formatting.isOverUploadLimit(info.totalSizeBytes) {
-      throw APIError(message: Formatting.uploadLimitMessage(info.totalSizeBytes, noun: "narration"))
-    }
-
     isWorking = true
     defer { isWorking = false }
 

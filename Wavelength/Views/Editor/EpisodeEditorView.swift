@@ -20,10 +20,6 @@ struct EpisodeEditorView: View {
     Group {
       if let episode = library.episode(episodeID), let document {
         VStack(spacing: 0) {
-          if episode.isOverUploadLimit {
-            uploadLimitBanner(episode)
-          }
-
           header(episode)
 
           SegmentEditorView(editor: document, player: player, focusTitle: episode.title)
@@ -74,20 +70,6 @@ struct EpisodeEditorView: View {
     .frame(maxWidth: .infinity, alignment: .leading)
     .padding(.horizontal, 20)
     .padding(.top, 16)
-  }
-
-  private func uploadLimitBanner(_ episode: Episode) -> some View {
-    VStack(spacing: 0) {
-      Label(Formatting.uploadLimitMessage(episode.totalSizeBytes), systemImage: "exclamationmark.triangle.fill")
-        .font(.callout)
-        .symbolRenderingMode(.multicolor)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.horizontal, 20)
-        .padding(.vertical, 8)
-        .background(Color.yellow.opacity(0.12))
-
-      Divider()
-    }
   }
 
   @ToolbarContentBuilder

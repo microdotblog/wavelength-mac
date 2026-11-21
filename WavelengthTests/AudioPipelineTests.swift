@@ -31,27 +31,49 @@ final class AudioPipelineTests {
     return url
   }
 
-  @Test func importsAnyAudioAsCanonicalStereoAAC() async throws {
-    let processed = try await AudioEditing.normalize(makeTone(seconds: 2))
-    let track = try #require(try await AVURLAsset(url: processed.url).loadTracks(withMediaType: .audio).first)
+  private func audioFormat(of url: URL) async throws -> AudioStreamBasicDescription {
+    let track = try #require(try await AVURLAsset(url: url).loadTracks(withMediaType: .audio).first)
     let description = try #require(try await track.load(.formatDescriptions).first)
-    let basic = try #require(CMAudioFormatDescriptionGetStreamBasicDescription(description)?.pointee)
+    return try #require(CMAudioFormatDescriptionGetStreamBasicDescription(description)?.pointee)
+  }
+
+  private func samples(of url: URL) throws -> Data {
+    let file = try AVAudioFile(forReading: url, commonFormat: .pcmFormatInt16, interleaved: true)
+    let buffer = try #require(AVAudioPCMBuffer(pcmFormat: file.processingFormat, frameCapacity: AVAudioFrameCount(file.length)))
+    try file.read(into: buffer)
+    let audio = buffer.audioBufferList.pointee.mBuffers
+    return Data(bytes: try #require(audio.mData), count: Int(audio.mDataByteSize))
+  }
+
+  @Test func importsAnyAudioAsCanonicalStereoALAC() async throws {
+    let processed = try await AudioEditing.normalize(makeTone(seconds: 2))
+    created.append(processed.url)
+    let basic = try await audioFormat(of: processed.url)
 
     #expect(abs(processed.durationSeconds - 2) < 0.1)
-    #expect(basic.mFormatID == kAudioFormatMPEG4AAC)
+    #expect(basic.mFormatID == kAudioFormatAppleLossless)
+    #expect(basic.mFormatFlags == kAppleLosslessFormatFlag_16BitSourceData)
     #expect(basic.mSampleRate == 44_100)
     #expect(basic.mChannelsPerFrame == 2)
     #expect(processed.waveform.count == Waveform.sampleCount)
     #expect(processed.waveform.allSatisfy { $0 > 0.5 })
   }
 
-  @Test func splitsAtTheRequestedTime() async throws {
+  @Test func splitsAndRejoinsALACWithoutChangingSamples() async throws {
     let processed = try await AudioEditing.normalize(makeTone(seconds: 3))
-    let (first, second) = try await AudioEditing.split(processed.url, at: 1, waveform: processed.waveform)
+    created.append(processed.url)
+    let splitTime = 0.653
+    let (first, second) = try await AudioEditing.split(processed.url, at: splitTime, waveform: processed.waveform)
+    let rejoined = AppDirectories.scratchFile("rejoined")
+    created.append(contentsOf: [first.url, second.url, rejoined])
 
-    #expect(abs(first.durationSeconds - 1) < 0.1)
-    #expect(abs(second.durationSeconds - 2) < 0.1)
+    #expect(abs(first.durationSeconds - splitTime) < 1 / 44_100)
+    #expect(abs(second.durationSeconds - (processed.durationSeconds - splitTime)) < 1 / 44_100)
     #expect(!first.waveform.isEmpty)
+
+    try await AudioEditing.merge([first.url, second.url], to: rejoined)
+    #expect(try await audioFormat(of: rejoined).mFormatID == kAudioFormatAppleLossless)
+    #expect(try samples(of: rejoined) == samples(of: processed.url))
   }
 
   @Test func refusesToSplitAtTheEdges() async throws {
@@ -62,14 +84,33 @@ final class AudioPipelineTests {
     }
   }
 
-  @Test func mergesSegmentsInOrder() async throws {
-    let first = try await AudioEditing.normalize(makeTone(seconds: 1))
+  @Test func mergesLegacyAACAndALACSegmentsInOrder() async throws {
+    let first = try await AudioEditing.narrationUploadAudio(from: makeTone(seconds: 1))
+    created.append(first)
     let second = try await AudioEditing.normalize(makeTone(seconds: 2, sampleRate: 22_050, channels: 2))
     let output = AppDirectories.scratchFile("merged")
+    created.append(contentsOf: [second.url, output])
 
-    try await AudioEditing.merge([first.url, second.url], to: output)
+    try await AudioEditing.merge([first, second.url], to: output)
 
     #expect(abs(try await AudioEditing.duration(of: output) - 3) < 0.15)
+    #expect(try await audioFormat(of: output).mFormatID == kAudioFormatAppleLossless)
+    let losslessSamples = try samples(of: second.url)
+    #expect(try samples(of: output).suffix(losslessSamples.count) == losslessSamples)
+  }
+
+  @Test func preparesAACUploadsWithoutChangingTheLosslessNarration() async throws {
+    let source = try await AudioEditing.normalize(makeTone(seconds: 2))
+    created.append(source.url)
+    let upload = try await AudioEditing.narrationUploadAudio(from: source.url)
+    created.append(upload)
+
+    #expect(upload != source.url)
+    #expect(upload.pathExtension == "m4a")
+    #expect(try await audioFormat(of: source.url).mFormatID == kAudioFormatAppleLossless)
+    #expect(try await audioFormat(of: upload).mFormatID == kAudioFormatMPEG4AAC)
+    #expect(abs(try await AudioEditing.duration(of: upload) - source.durationSeconds) < 0.1)
+    #expect(try await AudioEditing.narrationUploadAudio(from: upload) == upload)
   }
 
   @Test func encodesMonoMP3() async throws {
@@ -78,9 +119,7 @@ final class AudioPipelineTests {
 
     try await MP3Encoder.encode(processed.url, to: output)
 
-    let track = try #require(try await AVURLAsset(url: output).loadTracks(withMediaType: .audio).first)
-    let description = try #require(try await track.load(.formatDescriptions).first)
-    let basic = try #require(CMAudioFormatDescriptionGetStreamBasicDescription(description)?.pointee)
+    let basic = try await audioFormat(of: output)
 
     #expect(basic.mFormatID == kAudioFormatMPEGLayer3)
     #expect(basic.mChannelsPerFrame == 1)

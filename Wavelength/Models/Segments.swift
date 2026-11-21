@@ -123,7 +123,6 @@ nonisolated struct Episode: Identifiable, Hashable, Sendable {
   var createdAt: Date? { Formatting.parseDate(info.createdAt) }
   var publishedAt: Date? { info.publishedAt.flatMap(Formatting.parseDate) }
   var totalSizeBytes: Int64 { info.totalSizeBytes }
-  var isOverUploadLimit: Bool { Formatting.isOverUploadLimit(totalSizeBytes) }
   var exportedURL: URL { folder.appending(path: SegmentFolder.exportedFilename) }
 
   func url(for clip: ClipMeta) -> URL {

@@ -47,12 +47,6 @@ struct EpisodeAttachmentCard: View {
           .fixedSize()
       }
 
-      if episode.isOverUploadLimit {
-        Text(Formatting.uploadLimitMessage(episode.totalSizeBytes))
-          .font(.callout.weight(.semibold))
-          .foregroundStyle(Color.accentColor)
-      }
-
       HStack(spacing: 10) {
         Button {
           player.toggle()

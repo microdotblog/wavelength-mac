@@ -119,7 +119,19 @@ final class PostsStore {
     attachPhase = .uploading
     defer { attachPhase = .idle }
 
-    let audioURL = try await micropub.uploadAudio(fileURL, filename: "narration.m4a")
+    let upload = try await AudioEditing.narrationUploadAudio(from: fileURL)
+    defer {
+      if upload != fileURL {
+        try? FileManager.default.removeItem(at: upload)
+      }
+    }
+
+    let size = SegmentFolder.fileSize(upload)
+    if Formatting.isOverUploadLimit(size) {
+      throw APIError(message: Formatting.uploadLimitMessage(size, noun: "narration"))
+    }
+
+    let audioURL = try await micropub.uploadAudio(upload, filename: "narration.m4a")
 
     guard let source = try await micropub.source(of: post.url) else {
       throw APIError(message: "We could not load this post to add narration.")

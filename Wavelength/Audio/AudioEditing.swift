@@ -16,14 +16,22 @@ nonisolated struct ProcessedAudio: Sendable {
 nonisolated enum AudioEditing {
   static let sampleRate: Double = 44_100
   static let channelCount = 2
-  static let bitRate = 128_000
 
   static var canonicalSettings: [String: any Sendable] {
+    [
+      AVFormatIDKey: kAudioFormatAppleLossless,
+      AVSampleRateKey: sampleRate,
+      AVNumberOfChannelsKey: channelCount,
+      AVEncoderBitDepthHintKey: 16,
+    ]
+  }
+
+  private static var narrationUploadSettings: [String: any Sendable] {
     [
       AVFormatIDKey: kAudioFormatMPEG4AAC,
       AVSampleRateKey: sampleRate,
       AVNumberOfChannelsKey: channelCount,
-      AVEncoderBitRateKey: bitRate,
+      AVEncoderBitRateKey: 128_000,
     ]
   }
 
@@ -45,6 +53,29 @@ nonisolated enum AudioEditing {
 
       let waveform = (try? await WaveformAnalyzer.levels(of: output)) ?? []
       return ProcessedAudio(url: output, durationSeconds: duration, waveform: waveform)
+    } catch {
+      try? FileManager.default.removeItem(at: output)
+      throw error
+    }
+  }
+
+  @concurrent static func narrationUploadAudio(from source: URL) async throws -> URL {
+    let asset = AVURLAsset(url: source)
+
+    if source.pathExtension.lowercased() == "m4a" {
+      let tracks = try await asset.loadTracks(withMediaType: .audio)
+      if tracks.count == 1, let track = tracks.first {
+        let formats = try await track.load(.formatDescriptions)
+        if !formats.isEmpty, formats.allSatisfy({ CMFormatDescriptionGetMediaSubType($0) == kAudioFormatMPEG4AAC }) {
+          return source
+        }
+      }
+    }
+
+    let output = AppDirectories.scratchFile("narration-upload")
+    do {
+      try await transcode(asset, to: output, outputSettings: narrationUploadSettings)
+      return output
     } catch {
       try? FileManager.default.removeItem(at: output)
       throw error
@@ -140,7 +171,12 @@ nonisolated enum AudioEditing {
     return composition
   }
 
-  static func transcode(_ asset: AVAsset, to output: URL, range: CMTimeRange? = nil) async throws {
+  private static func transcode(
+    _ asset: AVAsset,
+    to output: URL,
+    range: CMTimeRange? = nil,
+    outputSettings: [String: any Sendable] = canonicalSettings
+  ) async throws {
     let tracks = try await asset.loadTracks(withMediaType: .audio)
 
     guard !tracks.isEmpty else {
@@ -173,7 +209,7 @@ nonisolated enum AudioEditing {
     reader.add(readerOutput)
 
     let writer = try AVAssetWriter(outputURL: output, fileType: .m4a)
-    let writerInput = AVAssetWriterInput(mediaType: .audio, outputSettings: canonicalSettings)
+    let writerInput = AVAssetWriterInput(mediaType: .audio, outputSettings: outputSettings)
     writerInput.expectsMediaDataInRealTime = false
 
     guard writer.canAdd(writerInput) else {
